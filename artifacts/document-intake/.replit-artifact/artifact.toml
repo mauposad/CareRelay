@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "CareRelay Document Intake"
+description = "A focused document intake module for uploading care documents, reviewing extracted care items, and returning only approved normalized care events to CareRelay."
+version = "1.0.0"
+id = "artifacts/document-intake"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25555
+
+[services.development]
+run = "pnpm --filter @workspace/document-intake run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/document-intake", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/document-intake/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25555"
+BASE_PATH = "/"
