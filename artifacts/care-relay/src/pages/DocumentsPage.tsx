@@ -44,6 +44,14 @@ function typeIcon(type: CareEventType) {
   }
 }
 
+/** Who a finding of this type reaches once it is confirmed on the dashboard. */
+function routingFor(type: CareEventType): string {
+  if (type === 'symptom') return 'Coordinating caregivers (the physician only if explicitly shared)';
+  if (type === 'appointment') return 'Margaret, coordinating family, and the physician';
+  if (type === 'medication') return 'Coordinating caregivers and Margaret’s daily plan';
+  return 'Coordinating caregivers';
+}
+
 export default function DocumentsPage() {
   const { user, activeCircle } = useAuth();
   const { extractDocumentFile, acceptDocumentEvents } = useCareContext();
@@ -78,7 +86,7 @@ export default function DocumentsPage() {
     );
   }
 
-  const runExtraction = async (file: File) => {
+  const runExtraction = async (file: File, isBundledSample = false) => {
     setFileError('');
     setSourceName(file.name);
     setItems([]);
@@ -88,10 +96,13 @@ export default function DocumentsPage() {
 
     try {
       const result = await extractDocumentFile(file);
-      if (result.mode !== 'ai') {
+      // Demo findings describe the bundled sample, so showing them for that
+      // file is honest. For a document someone uploaded they would not match
+      // its contents, so we refuse rather than misrepresent it.
+      if (result.mode !== 'ai' && !isBundledSample) {
         throw new Error(result.fallbackReason
-          ? `Live extraction unavailable: ${result.fallbackReason}. Sample findings are not shown for uploaded documents.`
-          : 'Live extraction is not configured. Sample findings are not shown for uploaded documents.');
+          ? `Live extraction is unavailable (${result.fallbackReason}), so this document was not read. Set ANTHROPIC_API_KEY to extract uploaded documents.`
+          : 'Live extraction is not configured, so this document was not read. Set ANTHROPIC_API_KEY to extract uploaded documents, or load the sample visit summary to walk through the review flow.');
       }
       setLastExtraction(result);
       setItems(result.events.map((event, index) => ({
@@ -134,7 +145,7 @@ export default function DocumentsPage() {
       const response = await fetch(`${import.meta.env.BASE_URL}${SAMPLE_DOCUMENT}`);
       if (!response.ok) throw new Error('Sample document is not available.');
       const blob = await response.blob();
-      await runExtraction(new File([blob], SAMPLE_DOCUMENT, { type: 'application/pdf' }));
+      await runExtraction(new File([blob], SAMPLE_DOCUMENT, { type: 'application/pdf' }), true);
     } catch (err) {
       setFileError(err instanceof Error ? err.message : 'Could not load the sample document.');
       setPhase('idle');
@@ -174,18 +185,18 @@ export default function DocumentsPage() {
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-serif">Document Preview</h1>
+          <h1 className="text-3xl font-serif">Document Intake</h1>
           {lastExtraction && (
-            <Badge variant="default" className="gap-1">
+            <Badge variant={lastExtraction.mode === 'ai' ? 'default' : 'secondary'} className="gap-1">
               <Sparkles className="w-3 h-3" />
-              Live extraction · Preview only
+              {lastExtraction.mode === 'ai' ? 'Live extraction · claude-opus-5' : 'Demo extraction (no API key)'}
             </Badge>
           )}
         </div>
         <p className="text-muted-foreground max-w-2xl">
-          Preview findings from a visit summary, discharge note or care letter.
-          Nothing is saved or shared. Review selections are temporary and do not create care records,
-          approval requests, tasks, or reminders.
+          Turn a visit summary, discharge note or care letter into reviewed care events for{' '}
+          {activeCircle?.recipientName ?? 'this care circle'}. Nothing enters the shared record
+          until you approve it.
         </p>
       </div>
 
@@ -321,12 +332,11 @@ export default function DocumentsPage() {
                               <div className="font-medium">{TYPE_LABEL[type]}</div>
                               <div className="text-xs text-muted-foreground">
                                 Confidence {Math.round((item.event.confidence ?? 0) * 100)}%
-                                {' · Preview only'}
                               </div>
                             </div>
                           </div>
                           <Badge variant={item.status === 'approved' ? 'default' : item.status === 'rejected' ? 'secondary' : 'outline'}>
-                            {item.status === 'approved' ? 'Reviewed locally'
+                            {item.status === 'approved' ? 'Approved'
                               : item.status === 'rejected' ? 'Not carrying forward'
                               : item.event.unresolvedTime ? 'Needs a time' : 'Awaiting review'}
                           </Badge>
@@ -339,7 +349,7 @@ export default function DocumentsPage() {
                         </p>
 
                         <div className="rounded-md bg-muted/40 p-2 text-xs">
-                          <strong>Preview only:</strong> Not shared with any care circle member.
+                          <strong>Will reach:</strong> {routingFor(type)}
                         </div>
 
                         {item.event.unresolvedTime && (
@@ -356,7 +366,7 @@ export default function DocumentsPage() {
                             className="gap-1"
                             onClick={() => setStatus(item.id, 'approved')}
                           >
-                            <Check className="w-3.5 h-3.5" /> Mark reviewed
+                            <Check className="w-3.5 h-3.5" /> Approve
                           </Button>
                           <Button
                             size="sm"
