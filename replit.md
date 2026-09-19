@@ -1,10 +1,11 @@
-# [Project name]
+# CareRelay
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+CareRelay turns noisy family care updates into structured, role-specific information for caregivers, clinicians, and older adults.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/care-relay run dev` — run the CareRelay frontend
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,15 +23,24 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/care-relay/src/types/index.ts` — normalized message, event, task, and care-profile contracts
+- `artifacts/care-relay/src/lib/providers/` — mock extraction and transcription provider interfaces
+- `artifacts/care-relay/src/components/` — family, physician, elder, Care Circle, and demo controls
+- `artifacts/care-relay/src/index.css` — CareRelay visual tokens and global styles
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The current build is frontend-only; mock data is isolated behind service functions for later backend replacement.
+- Role-based visibility is centralized in the RBAC module instead of being scattered across components.
+- Family, physician, and elder personas use distinct information architectures, not one dashboard with renamed navigation.
+- Product copy treats symptoms as family-reported observations and never presents diagnosis or medical advice.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Switch among Care Owner, Primary Caregiver, Family Support, Family Viewer, Physician, and Elder demo roles.
+- Simulate a noisy family message being organized into relevant care events.
+- Confirm assigned transportation and see the result propagate across role-specific views.
+- Demonstrate selective sharing and access rules through the Care Circle experience.
 
 ## User preferences
 

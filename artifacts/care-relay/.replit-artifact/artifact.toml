@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "CareRelay"
+description = "A responsive elder-care coordination app that turns noisy family updates into structured, role-specific information for caregivers, clinicians, and older adults."
+version = "1.0.0"
+id = "artifacts/care-relay"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18512
+
+[services.development]
+run = "pnpm --filter @workspace/care-relay run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/care-relay", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/care-relay/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18512"
+BASE_PATH = "/"

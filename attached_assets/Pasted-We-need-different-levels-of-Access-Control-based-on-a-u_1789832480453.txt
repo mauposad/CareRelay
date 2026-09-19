@@ -1,0 +1,20 @@
+We need different levels of Access Control based on a user's level of access. There is four primary users
+
+    Primary User (elderly person)
+    Primary CareTaker
+    Primary Physician
+    Friends & Family. (Closer circle)
+
+The responsibilities for each person is as follows:
+
+    The primary user should have full access over any and all documents under their account and should be able to add and remove depending on which tier they are in. Within the role of primary user there will be 3 tiers: Non Assisted, Transitional, Fully Assisted.
+
+    Non assisted means the elderly patient is still within the capacity to care for one's self. Therefore they can still take actions on their behalf regarding appointments, medicines, diet, exercises, tests, surgeries, adding or removing users from their circle.
+    Transitional means that the primary user and primary caretaker are now taking joint discussions. This is meant for elderly patients transitioning into fully assisted. The user will lose some privilidges in terms that everythign requires dual authorizaiton from their behalf and primary caretaker.
+    Fully assisted is for elderly patients that now rely on a primary caretaker. The primary caretaker is now in complete control to make actions on their behalf for diet, medicines, appointments, adding people into the circle.
+
+    Primary Caretaker will have to have a set of permissions that grow in relationship with the primary user they are associated with.
+
+    Primary Physician (Doctor in this case) has the highest level of permissions in this case. They will never be removed from a circle and have full access to any and all documents / actions within the users under them. They can also appoint new primary caretakers to users dictated by situation.
+
+    Friends & Family would be other users added into the circle that are able to see what is going on with the user's circle they are associated with. Doctor's appointments, status of the recovery / rehab. Current state of the user while not being able to see sensitive information. This role serves a function meant to keep close relatives and friends in the loop with the user circle they have been added to.
