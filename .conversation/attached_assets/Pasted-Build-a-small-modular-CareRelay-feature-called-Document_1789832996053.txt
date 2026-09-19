@@ -1,0 +1,639 @@
+Build a small, modular CareRelay feature called:
+
+“Document Intake”
+
+This feature will eventually be plugged into the main CareRelay application, so it must be SELF-CONTAINED, MINIMAL, and EASY TO INTEGRATE.
+
+Do not build another full CareRelay dashboard.
+
+==================================================
+PURPOSE
+==================================================
+
+CareRelay currently receives care information from sources such as:
+
+- WhatsApp
+- iMessage
+- voice / speech-to-text
+- caregiver updates
+
+We now need another information source:
+
+DOCUMENTS.
+
+Examples:
+
+- physician visit summary
+- discharge instructions
+- lab report
+- prescription instructions
+- physical therapy instructions
+- appointment paperwork
+- care plan
+- home-health instructions
+- insurance / care coordination document
+- other documents relevant to an elderly person's care
+
+The user should be able to upload a document.
+
+The system should:
+
+1. extract the text/content
+2. use AI to identify relevant care information
+3. convert that information into structured CareRelay care events
+4. show the extracted information to the user for review
+5. let the user approve or reject individual items
+6. return only APPROVED items in the same normalized format used by the main CareRelay application
+
+The document itself should NOT automatically make changes to the care plan.
+
+Human review is required before information becomes part of CareRelay.
+
+==================================================
+MOST IMPORTANT ARCHITECTURE REQUIREMENT
+==================================================
+
+THIS MUST BE PLUGGABLE INTO THE EXISTING CARERELAY UI.
+
+Build the feature so that the main CareRelay app can eventually call something conceptually like:
+
+<DocumentIntake
+  elderId="margaret_001"
+  onEventsApproved={(events) => addEvents(events)}
+/>
+
+Do not tightly couple this feature to a particular dashboard.
+
+The feature should expose one clear result:
+
+APPROVED NORMALIZED CARE EVENTS.
+
+Keep all document-specific functionality inside the module.
+
+==================================================
+MINIMAL USER FLOW
+==================================================
+
+The interface only needs four stages.
+
+------------------------------------------
+STEP 1 — UPLOAD
+------------------------------------------
+
+Title:
+
+Add Care Document
+
+Subtitle:
+
+“Upload a document and CareRelay will identify information that may be relevant to Margaret’s care.”
+
+Provide:
+
+[ Upload Document ]
+
+Allow initially:
+
+- PDF
+- JPG
+- JPEG
+- PNG
+
+If DOCX support is simple to implement, include it.
+
+Otherwise display a graceful unsupported-file message rather than spending excessive time on file formats.
+
+Show uploaded file:
+
+Dr_Patel_After_Visit_Summary.pdf
+
+File uploaded ✓
+
+Button:
+
+[ Analyze Document ]
+
+==================================================
+STEP 2 — PROCESSING
+==================================================
+
+Show a clean loading state:
+
+“CareRelay is reviewing this document…”
+
+Then:
+
+“Identifying appointments, instructions, observations, medications, and care tasks.”
+
+Do not make medical claims.
+
+==================================================
+STEP 3 — REVIEW EXTRACTED INFORMATION
+==================================================
+
+This is the most important screen.
+
+AI should produce PROPOSED CARE ITEMS.
+
+Example uploaded document:
+
+“Margaret should attend physical therapy Friday at 10 AM.
+Continue walking for 15 minutes each morning.
+Follow up with Dr. Patel in two weeks.
+Patient reported occasional dizziness.”
+
+The UI should produce separate cards:
+
+------------------------------------------
+
+APPOINTMENT
+
+Physical Therapy
+
+Friday
+10:00 AM
+
+Suggested visibility:
+Margaret
+Primary Caregiver
+
+Source:
+Dr. Patel After Visit Summary
+Page 1
+
+[Approve] [Reject]
+
+------------------------------------------
+
+CARE INSTRUCTION
+
+15-minute morning walk
+
+Frequency:
+Daily
+
+Suggested responsibility:
+Margaret
+
+Suggested visibility:
+Margaret
+Primary Caregiver
+
+Source:
+Dr. Patel After Visit Summary
+Page 1
+
+[Approve] [Reject]
+
+------------------------------------------
+
+APPOINTMENT
+
+Follow-up with Dr. Patel
+
+Timing:
+In approximately 2 weeks
+
+Needs scheduling
+
+Suggested visibility:
+Primary Caregiver
+Margaret
+
+[Approve] [Reject]
+
+------------------------------------------
+
+FAMILY-REPORTED / DOCUMENTED OBSERVATION
+
+Occasional dizziness noted in document
+
+Suggested visibility:
+Primary Caregiver
+Dr. Patel
+
+IMPORTANT:
+
+Do NOT display:
+
+“Patient has dizziness.”
+
+Prefer wording such as:
+
+“Document notes occasional dizziness.”
+
+or:
+
+“Dizziness documented in uploaded visit summary.”
+
+[Approve] [Reject]
+
+==================================================
+STEP 4 — APPROVE AND SEND
+==================================================
+
+After review:
+
+3 items approved
+1 item rejected
+
+Button:
+
+[ Add 3 Items to CareRelay ]
+
+When clicked, call the integration callback / event handler and provide normalized CareRelay events.
+
+Then show:
+
+✓ 3 care items ready for CareRelay
+
+==================================================
+AI EXTRACTION CATEGORIES
+==================================================
+
+Keep extraction limited to useful categories.
+
+Supported categories:
+
+- appointment
+- medication_update
+- care_instruction
+- symptom_or_observation
+- task
+- therapy
+- follow_up
+- dietary_instruction
+- activity_instruction
+- general_care_note
+
+Do NOT attempt to understand everything in the document.
+
+Ignore irrelevant administrative text where possible.
+
+==================================================
+NORMALIZED OUTPUT FORMAT
+==================================================
+
+Return approved information using CareRelay's normalized event structure.
+
+Use an object conceptually like:
+
+{
+  "id": "generated_unique_id",
+  "elderId": "margaret_001",
+
+  "timestamp": "2026-09-19T12:00:00",
+
+  "source": "document",
+  "sourceLabel": "Dr. Patel After Visit Summary",
+
+  "sourceDocument": {
+    "fileName": "Dr_Patel_After_Visit_Summary.pdf",
+    "page": 1
+  },
+
+  "category": "appointment",
+
+  "summary": "Physical therapy scheduled for Friday at 10:00 AM.",
+
+  "subject": "Margaret Wilson",
+
+  "reportedBy": "Uploaded document",
+
+  "assignedTo": null,
+
+  "dueAt": "2026-09-25T10:00:00",
+
+  "status": "confirmed",
+
+  "physicianRelevant": false,
+  "familyRelevant": true,
+  "elderRelevant": true,
+
+  "recommendedRecipients": [
+    "PRIMARY_CAREGIVER",
+    "ELDER"
+  ],
+
+  "rawSourceAvailable": true
+}
+
+The main CareRelay app should not need to understand how document processing works.
+
+It should simply receive these normalized events.
+
+==================================================
+IMPORTANT — DOCUMENT SOURCE TRACEABILITY
+==================================================
+
+Every extracted item MUST retain its source.
+
+Show:
+
+Source:
+Dr. Patel After Visit Summary
+Page 1
+
+If page number can be determined reliably, include it.
+
+If not, show just the document name.
+
+Never invent a page number.
+
+This source information should stay attached to the resulting CareRelay event.
+
+Later the main application should be able to show:
+
+“Source evidence”
+
+and link back to this uploaded document.
+
+==================================================
+ROLE ROUTING
+==================================================
+
+The AI can SUGGEST who should receive the information.
+
+Example:
+
+Physical Therapy Appointment
+→ Margaret
+→ Primary Caregiver
+
+Transportation requirement
+→ Family Support
+
+Clinically relevant observation
+→ Primary Caregiver
+→ Physician, only if shared
+
+Medication pickup logistics
+→ Caregiver
+
+Do NOT automatically send every extracted item to every role.
+
+The feature should output:
+
+recommendedRecipients
+
+and relevance fields such as:
+
+familyRelevant
+physicianRelevant
+elderRelevant
+
+The main CareRelay RBAC system will make the final access decision.
+
+==================================================
+IMPORTANT — PHYSICIAN SHARING
+==================================================
+
+Do not assume information should automatically be sent to the physician.
+
+For physician-relevant items show:
+
+Suggested:
+“Relevant for clinician review”
+
+and optionally:
+
+[ Share with Dr. Patel ]
+
+The upload system should not bypass CareRelay's privacy/RBAC layer.
+
+==================================================
+MEDICAL SAFETY
+==================================================
+
+This application extracts information.
+
+It does NOT interpret medical meaning.
+
+Never:
+
+- diagnose a condition
+- recommend medication changes
+- tell the patient to stop medication
+- declare something medically safe
+- infer disease from lab values
+- create clinical conclusions that are not in the source
+- fabricate instructions
+
+If the document says:
+
+“Take medication X once daily”
+
+CareRelay may extract:
+
+Medication instruction:
+“Document instructs patient to take Medication X once daily.”
+
+If the document contains a lab value, preserve the value if useful, but DO NOT independently classify it as dangerous, normal, or abnormal unless the source itself explicitly says so.
+
+Always distinguish:
+
+DOCUMENT SAYS
+
+from
+
+AI INFERENCE.
+
+For the hackathon MVP, avoid medical inference entirely.
+
+==================================================
+AMBIGUITY HANDLING
+==================================================
+
+Do not silently guess missing details.
+
+Example document:
+
+“Follow up next Friday.”
+
+If the date cannot be reliably resolved, return:
+
+Follow-up appointment
+Date: Needs confirmation
+
+The review screen should display:
+
+⚠ Needs clarification
+
+and allow the caregiver to correct the value before approval.
+
+Likewise:
+
+“Take this medication in the morning.”
+
+should not invent a dosage.
+
+==================================================
+COMPONENT STRUCTURE
+==================================================
+
+Keep this feature modular.
+
+Conceptually organize it into:
+
+DocumentIntake
+
+DocumentUploader
+
+DocumentProcessingState
+
+ExtractedCareItemsReview
+
+DocumentCareItemCard
+
+DocumentProcessingService
+
+NormalizedCareEventAdapter
+
+Do not spread document-processing logic throughout unrelated application components.
+
+==================================================
+INTEGRATION CONTRACT
+==================================================
+
+The feature should expose a very simple integration boundary.
+
+INPUT:
+
+elderId
+elderName
+optional currentUser
+
+OUTPUT:
+
+approvedEvents[]
+
+The parent CareRelay app should only need to:
+
+1. open Document Intake
+2. pass the elder ID
+3. receive normalized events when approved
+4. add those events to the existing CareRelay state/event system
+
+Do not require the existing CareRelay application to import document-parser-specific logic.
+
+==================================================
+DEVELOPMENT MODE
+==================================================
+
+Because this is a hackathon feature, prioritize reliability.
+
+If real AI/document parsing credentials are available, use them.
+
+If they are not available, create a clearly labeled DEMO PROCESSING MODE.
+
+Include a button:
+
+[ Load Sample Visit Summary ]
+
+Use a realistic fake visit summary.
+
+Then show extracted proposed events.
+
+Never pretend demo extraction is a production AI call if it is mocked.
+
+Separate:
+
+documentProcessingService
+
+from the UI so we can replace the implementation later.
+
+==================================================
+DESIGN
+==================================================
+
+Use the same visual philosophy as CareRelay:
+
+- calm
+- trustworthy
+- accessible
+- warm healthcare feel
+- rounded cards
+- clean typography
+- generous spacing
+
+Do NOT build:
+
+- analytics dashboards
+- charts
+- full medical record systems
+- document libraries
+- document search
+- OCR management screens
+- complex file organization
+- full EHR functionality
+
+This is ONLY:
+
+UPLOAD
+→ PROCESS
+→ REVIEW
+→ APPROVE
+→ RETURN EVENTS
+
+==================================================
+DEMO EXAMPLE
+==================================================
+
+Include a sample fake physician document containing:
+
+“Margaret Wilson was seen today for follow-up.
+
+Margaret reported occasional dizziness in the morning.
+
+Continue a 15-minute walk each morning as tolerated.
+
+Physical therapy is scheduled for Friday at 10:00 AM.
+
+Follow up with Dr. Maya Patel in approximately two weeks.”
+
+The demo should visually transform that ONE DOCUMENT into:
+
+1. Reported observation:
+Occasional morning dizziness
+
+2. Care instruction:
+15-minute morning walk
+
+3. Appointment:
+Physical Therapy
+Friday • 10:00 AM
+
+4. Follow-up:
+Dr. Patel
+Approximately two weeks
+Needs exact date confirmation
+
+Then allow each item to be independently approved/rejected.
+
+==================================================
+SUCCESS CONDITION
+==================================================
+
+The feature is successful if I can later plug it into the existing CareRelay application and do this:
+
+Upload physician document
+
+↓
+
+AI extracts useful care facts
+
+↓
+
+Human reviews them
+
+↓
+
+Approved information becomes normalized CareRelay events
+
+↓
+
+Existing CareRelay RBAC decides what Sarah, John, Dr. Patel, Margaret, etc. can see.
+
+Do not rebuild CareRelay.
+
+Build ONLY this modular intake feature.
