@@ -337,7 +337,7 @@ still runs end to end on deterministic demo data and labels each screen
 ## Demo Accounts
 
 `./scripts/dev.sh` seeds the Wilson family care circle. All accounts use the
-password `carerelay-demo`.
+password `Buildathon123!`.
 
 | Account | Role | What they see |
 |---|---|---|
