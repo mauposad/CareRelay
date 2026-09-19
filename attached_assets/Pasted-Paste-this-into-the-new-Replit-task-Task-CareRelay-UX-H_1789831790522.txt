@@ -1,0 +1,136 @@
+Paste this into the new Replit task:
+
+> **Task: CareRelay UX + Hackathon Demo Audit**
+>
+> Inspect the current CareRelay app exactly as it exists right now. **Do not modify anything yet.**
+>
+> I need a brutally specific product/UX audit for a hackathon demo. Do not give generic UI advice. Review the actual implemented screens, interactions, labels, states, and role behavior.
+>
+> Evaluate these areas:
+>
+> 1. **Three user experiences**
+>
+>    * Family/Caregiver
+>    * Physician/Doctor
+>    * Elderly Person
+>
+>    Determine whether these are genuinely different experiences or mostly the same dashboard with cards hidden.
+>
+> 2. **Core product story**
+>
+>    The core idea is:
+>
+>    **“One noisy family message comes in, CareRelay extracts the useful information, and each person sees only what they need to know.”**
+>
+>    Check whether this is obvious within the first 10–15 seconds of using the app.
+>
+> 3. **Family RBAC**
+>
+>    Review whether family roles are clearly differentiated:
+>
+>    * Care Owner / Admin
+>    * Primary Caregiver
+>    * Family Support
+>    * Family Viewer
+>
+>    Check whether permissions and information boundaries are visible and convincing.
+>
+> 4. **Physician view**
+>
+>    Check whether:
+>
+>    * irrelevant family logistics are filtered out
+>    * clinically relevant information is easy to scan
+>    * family-reported symptoms are clearly labeled as family-reported
+>    * the interface feels professional
+>    * it does not pretend to be a full EHR
+>    * no diagnosis or medical recommendation is implied
+>
+> 5. **Elderly-person view**
+>
+>    Check whether it is:
+>
+>    * extremely simple
+>    * large-text and accessibility-first
+>    * low-noise
+>    * easy to understand at a glance
+>    * free of technical/AI language
+>    * clearly focused on “what do I need to know today?”
+>
+> 6. **Demo flow**
+>
+>    Inspect whether the app currently demonstrates this flow clearly:
+>
+>    **Incoming WhatsApp/iMessage/voice update**
+>    → AI processing
+>    → structured care events
+>    → role-based filtering
+>    → Family sees tasks/logistics
+>    → Physician sees clinical signal
+>    → Elder sees simple schedule
+>
+>    Identify exactly where this story is weak, missing, confusing, or visually underwhelming.
+>
+> 7. **UX issues**
+>
+>    Look specifically for:
+>
+>    * broken or dead buttons
+>    * confusing navigation
+>    * poor visual hierarchy
+>    * redundant cards
+>    * information overload
+>    * weak copy
+>    * inconsistent terminology
+>    * poor spacing
+>    * bad loading states
+>    * missing empty states
+>    * unrealistic demo data
+>    * state changes that do not propagate correctly
+>
+> 8. **Differentiation**
+>
+>    Judge whether the UI clearly answers:
+>
+>    **“Why is this better than just using WhatsApp/iMessage?”**
+>
+>    The answer should visually demonstrate selective information sharing and role-based relevance filtering.
+>
+> 9. **Hackathon judge perspective**
+>
+>    Assume judges have only 5 minutes.
+>
+>    Identify anything that:
+>
+>    * takes too long to understand
+>    * feels unfinished
+>    * looks too generic
+>    * distracts from the core idea
+>    * weakens the wow moment
+>
+> Return the audit in this format:
+>
+> **CRITICAL**
+>
+> * Exact issue
+> * Why it hurts the demo
+> * Exact change needed
+>
+> **HIGH**
+>
+> * Exact issue
+> * Why it matters
+> * Exact change needed
+>
+> **MEDIUM**
+>
+> * Exact issue
+> * Exact change needed
+>
+> Then finish with:
+>
+> **Best 60–90 second demo path using the current app**
+>
+> Give the exact sequence of screens/interactions I should show to judges.
+>
+> Again: **Do not make changes yet. Only inspect and critique.**
