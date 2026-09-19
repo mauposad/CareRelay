@@ -1,17 +1,16 @@
 import { useRef, useState } from 'react';
-import { Link } from 'wouter';
-import { useCareContext } from '../store/CareContext';
+import { useAuth } from '../store/AuthContext';
+import { extractDocument, type ApiExtractionResponse } from '../lib/api';
 import { CareEvent, CareEventType } from '../types';
-import { canUser, PERMISSIONS } from '../lib/rbac';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Activity, AlertTriangle, ArrowRight, BadgeCheck, Calendar, Check, ClipboardList,
+  Activity, AlertTriangle, ArrowRight, Calendar, Check, ClipboardList,
   FileCheck2, FileText, Loader2, LockKeyhole, Pill, RotateCcw, ShieldCheck, Sparkles, Upload, X,
 } from 'lucide-react';
 
-type Phase = 'idle' | 'processing' | 'review' | 'complete';
+type Phase = 'idle' | 'processing' | 'review';
 type ItemStatus = 'pending' | 'approved' | 'rejected';
 
 type ReviewItem = {
@@ -43,27 +42,19 @@ function typeIcon(type: CareEventType) {
   }
 }
 
-/** Who a finding of this type reaches once it is confirmed on the dashboard. */
-function routingFor(type: CareEventType): string {
-  if (type === 'symptom') return 'Coordinating caregivers (Dr. Patel only if explicitly shared)';
-  if (type === 'appointment') return 'Margaret, coordinating family, and Dr. Patel';
-  if (type === 'medication') return 'Coordinating caregivers and Margaret’s daily plan';
-  return 'Coordinating caregivers';
-}
-
 export default function DocumentsPage() {
-  const { extractDocument, acceptDocumentEvents, isProcessing, currentPersona, extractionStatus, lastExtraction } =
-    useCareContext();
+  const { user, activeCircle } = useAuth();
+  const [lastExtraction, setLastExtraction] = useState<ApiExtractionResponse | null>(null);
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [sourceName, setSourceName] = useState('');
   const [fileError, setFileError] = useState('');
   const [unresolved, setUnresolved] = useState<string[]>([]);
-  const [carriedCount, setCarriedCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isProcessing = phase === 'processing';
 
-  const canReview = canUser(currentPersona.role, PERMISSIONS.VIEW_ALL_STRUCTURED_EVENTS);
+  const canReview = Boolean(user && (activeCircle?.role === 'primary_user' || activeCircle?.role === 'primary_caretaker'));
 
   if (!canReview) {
     return (
@@ -73,8 +64,8 @@ export default function DocumentsPage() {
             <LockKeyhole className="w-8 h-8 mx-auto text-muted-foreground" />
             <h1 className="text-2xl font-serif">Document intake is restricted</h1>
             <p className="text-muted-foreground">
-              {currentPersona.name} does not have permission to review care documents. Switch to the
-              Primary Caregiver or Care Owner role to use this workspace.
+              Document preview requires an authorized primary user or primary caretaker membership
+              in the active care circle.
             </p>
           </CardContent>
         </Card>
@@ -86,14 +77,27 @@ export default function DocumentsPage() {
     setFileError('');
     setSourceName(file.name);
     setItems([]);
+    setLastExtraction(null);
     setUnresolved([]);
     setPhase('processing');
 
     try {
       const result = await extractDocument(file);
+      if (result.mode !== 'ai') {
+        throw new Error(result.fallbackReason
+          ? `Live extraction unavailable: ${result.fallbackReason}. Sample findings are not shown for uploaded documents.`
+          : 'Live extraction is not configured. Sample findings are not shown for uploaded documents.');
+      }
+      setLastExtraction(result);
       setItems(result.events.map((event, index) => ({
         id: `doc_item_${index}`,
-        event,
+        event: {
+          type: event.type,
+          summary: event.summary,
+          evidence: event.evidence,
+          confidence: event.confidence,
+          unresolvedTime: event.unresolvedTime,
+        },
         status: 'pending',
       })));
       setUnresolved(result.unresolved);
@@ -138,38 +142,31 @@ export default function DocumentsPage() {
 
   const approvedItems = items.filter(item => item.status === 'approved');
 
-  const carryForward = () => {
-    const count = acceptDocumentEvents(approvedItems.map(item => item.event), sourceName);
-    setCarriedCount(count);
-    setPhase('complete');
-  };
-
   const reset = () => {
     setPhase('idle');
     setItems([]);
     setSourceName('');
     setFileError('');
     setUnresolved([]);
-    setCarriedCount(0);
+    setLastExtraction(null);
   };
-
-  const aiLive = lastExtraction ? lastExtraction.mode === 'ai' : extractionStatus?.aiEnabled;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-serif">Document Intake</h1>
-          {extractionStatus && (
-            <Badge variant={aiLive ? 'default' : 'secondary'} className="gap-1">
+          <h1 className="text-3xl font-serif">Document Preview</h1>
+          {lastExtraction && (
+            <Badge variant="default" className="gap-1">
               <Sparkles className="w-3 h-3" />
-              {aiLive ? `Live extraction · ${extractionStatus.model}` : 'Demo extraction (no API key)'}
+              Live extraction · Preview only
             </Badge>
           )}
         </div>
         <p className="text-muted-foreground max-w-2xl">
-          Turn a visit summary, discharge note or care letter into reviewed care events for Margaret
-          Wilson. Nothing enters the shared record until you approve it.
+          Preview findings from a visit summary, discharge note or care letter.
+          Nothing is saved or shared. Review selections are temporary and do not create care records,
+          approval requests, tasks, or reminders.
         </p>
       </div>
 
@@ -204,7 +201,7 @@ export default function DocumentsPage() {
                 accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                 onChange={(event) => handleFile(event.target.files?.[0])}
               />
-              <Button variant="outline" size="sm" disabled={isProcessing} onClick={() => inputRef.current?.click()}>
+              <Button variant="outline" size="sm" disabled={isProcessing} onClick={() => inputRef.current?.click()} data-testid="button-choose-document">
                 {sourceName ? 'Replace document' : 'Choose a file'}
               </Button>
             </div>
@@ -305,12 +302,12 @@ export default function DocumentsPage() {
                               <div className="font-medium">{TYPE_LABEL[type]}</div>
                               <div className="text-xs text-muted-foreground">
                                 Confidence {Math.round((item.event.confidence ?? 0) * 100)}%
-                                {item.event.ownerId ? ` · for ${item.event.ownerId}` : ' · unassigned'}
+                                {' · Preview only'}
                               </div>
                             </div>
                           </div>
                           <Badge variant={item.status === 'approved' ? 'default' : item.status === 'rejected' ? 'secondary' : 'outline'}>
-                            {item.status === 'approved' ? 'Approved'
+                            {item.status === 'approved' ? 'Reviewed locally'
                               : item.status === 'rejected' ? 'Not carrying forward'
                               : item.event.unresolvedTime ? 'Needs a time' : 'Awaiting review'}
                           </Badge>
@@ -323,13 +320,13 @@ export default function DocumentsPage() {
                         </p>
 
                         <div className="rounded-md bg-muted/40 p-2 text-xs">
-                          <strong>Will reach:</strong> {routingFor(type)}
+                          <strong>Preview only:</strong> Not shared with any care circle member.
                         </div>
 
                         {item.event.unresolvedTime && (
                           <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" />
-                            The document does not pin down a time. You will set it when confirming on the dashboard.
+                            The document does not pin down a time. Confirm it independently before using this finding.
                           </div>
                         )}
 
@@ -340,7 +337,7 @@ export default function DocumentsPage() {
                             className="gap-1"
                             onClick={() => setStatus(item.id, 'approved')}
                           >
-                            <Check className="w-3.5 h-3.5" /> Approve
+                            <Check className="w-3.5 h-3.5" /> Mark reviewed
                           </Button>
                           <Button
                             size="sm"
@@ -376,42 +373,21 @@ export default function DocumentsPage() {
                     <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <div className="font-medium">
-                        {approvedItems.length} {approvedItems.length === 1 ? 'event' : 'events'} ready to carry forward
+                        {approvedItems.length} {approvedItems.length === 1 ? 'finding' : 'findings'} marked reviewed locally
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Approved findings become proposed events on the care dashboard for final confirmation.
+                        Preview only. Carry-forward to server-backed records and approval workflows is not available.
                       </div>
                     </div>
                   </div>
-                  <Button onClick={carryForward} disabled={approvedItems.length === 0} className="gap-1 shrink-0">
-                    Carry forward <ArrowRight className="w-4 h-4" />
+                  <Button onClick={reset} variant="outline" className="gap-1 shrink-0" data-testid="button-reset-document">
+                    <RotateCcw className="w-4 h-4" /> Clear preview
                   </Button>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {phase === 'complete' && (
-            <Card>
-              <CardContent className="p-12 text-center space-y-4">
-                <BadgeCheck className="w-9 h-9 mx-auto text-primary" />
-                <h2 className="font-serif text-2xl">Added to the care record</h2>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  {carriedCount} reviewed {carriedCount === 1 ? 'finding' : 'findings'} from{' '}
-                  <strong className="text-foreground">{sourceName}</strong> {carriedCount === 1 ? 'is' : 'are'} now
-                  waiting for confirmation on the care dashboard, each with its source quote attached.
-                </p>
-                <div className="flex flex-wrap gap-3 justify-center pt-2">
-                  <Button asChild className="gap-1">
-                    <Link href="/dashboard">Review on the dashboard <ArrowRight className="w-4 h-4" /></Link>
-                  </Button>
-                  <Button variant="outline" onClick={reset} className="gap-1">
-                    <RotateCcw className="w-3.5 h-3.5" /> Review another document
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </div>

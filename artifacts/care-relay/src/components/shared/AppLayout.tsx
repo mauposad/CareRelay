@@ -1,23 +1,13 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { useCareContext } from '../../store/CareContext';
-import { PERSONAS, canUser, PERMISSIONS } from '../../lib/rbac';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, Settings, FileText } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'wouter';
+import { useAuth } from '../../store/AuthContext';
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { currentPersona, setPersona, resetDemo } = useCareContext();
+  const { user, circles, activeCircle, setActiveCircle, signOut } = useAuth();
   const [location] = useLocation();
-  const scopeByRole: Record<string, string> = {
-    PRIMARY_CAREGIVER: 'reviews all care updates',
-    CARE_OWNER: 'manages the care circle',
-    FAMILY_SUPPORT: 'sees John’s assigned logistics',
-    FAMILY_VIEWER: 'sees Emily’s concise read-only summary',
-    PHYSICIAN: 'sees Dr. Patel’s shared observations',
-    ELDER: 'sees Margaret’s personal plan'
-  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20">
@@ -31,45 +21,31 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <span className="font-serif font-semibold text-xl tracking-tight text-foreground hidden sm:inline-block">CareRelay</span>
             </Link>
             
-            {location !== '/' && (
+            {user && location !== '/' && (
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground hidden md:inline-block">Demo Role Switcher:</span>
-                <Select value={currentPersona.id} onValueChange={(val) => setPersona(val as any)}>
-                  <SelectTrigger className="w-[180px] h-9 bg-muted/50 border-0">
-                    <SelectValue placeholder="Select persona" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERSONAS.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} <span className="text-muted-foreground text-xs ml-1">({p.title})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {location !== '/' && (
-              <div className="hidden lg:block text-xs text-muted-foreground border-l pl-4">
-                <strong className="text-foreground">{currentPersona.name}</strong> · {scopeByRole[currentPersona.role]}
+                <span className="text-sm font-medium text-muted-foreground hidden md:inline-block">{user.displayName} · {activeCircle?.role.replaceAll("_", " ")}</span>
+                {circles.length > 1 && <select className="h-9 rounded-md bg-muted/50 px-2 text-sm" value={activeCircle?.id ?? ""} onChange={(event) => { const circle = circles.find((item) => item.id === event.target.value); if (circle) setActiveCircle(circle); }} data-testid="select-care-circle">
+                  {circles.map((circle) => <option key={circle.id} value={circle.id}>{circle.name}</option>)}
+                </select>}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-3">
-            {location !== '/' && (
-              <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
-                <Link href="/">Overview</Link>
-              </Button>
-            )}
-            {location !== '/' && canUser(currentPersona.role, PERMISSIONS.VIEW_ALL_STRUCTURED_EVENTS) && (
+            {user && (activeCircle?.role === 'primary_user' || activeCircle?.role === 'primary_caretaker') && (
               <Button variant={location === '/documents' ? 'secondary' : 'ghost'} size="sm" asChild>
-                <Link href="/documents" className="flex items-center gap-2">
+                <Link href="/documents" className="flex items-center gap-2" data-testid="link-documents">
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Documents</span>
                 </Link>
               </Button>
             )}
-            {currentPersona.role === 'CARE_OWNER' && location !== '/settings' && location !== '/' && (
+            {location !== '/' && (
+              <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
+                <Link href="/">Overview</Link>
+              </Button>
+            )}
+            {activeCircle && activeCircle.role !== 'family' && location !== '/settings' && location !== '/' && (
               <Button variant="outline" size="sm" asChild>
                 <Link href="/settings" className="flex items-center gap-2">
                   <Settings className="w-4 h-4" />
@@ -77,6 +53,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </Link>
               </Button>
             )}
+            {user && <Button variant="ghost" size="sm" onClick={() => void signOut()} data-testid="button-sign-out">Sign out</Button>}
           </div>
         </div>
       </header>
@@ -84,7 +61,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {/* Disclaimer Banner for Clinical Safety */}
       <div className="bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs py-2 px-4 flex items-center justify-center gap-2 text-center border-b border-amber-200 dark:border-amber-900/50">
         <ShieldAlert className="w-4 h-4 shrink-0" />
-        <span>CareRelay is a coordination tool, not a medical device. For emergencies, contact local emergency services. Demo personalization is for preview only, not production security or authentication.</span>
+        <span>CareRelay is a coordination tool, not a medical device. For emergencies, contact local emergency services.</span>
       </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">

@@ -2,9 +2,9 @@
 name: Architecture scope
 description: Scope and safety constraints for adapting the CareRelay AI architecture.
 ---
-Keep the architecture adaptation a clearly labeled frontend demo unless the user explicitly authorizes live backend/integration work.
+The original frontend-only scope is superseded for the authenticated branch: the user explicitly requested bringing main into production-auth-and-rbac. Preserve the authenticated branch's authorization boundary when reconciling demo features.
 
-**Why:** The original brief reserves messaging and transcription integrations for another developer. The architecture describes a larger target system, not permission to silently replace teammates' work.
+**Why:** Main's document/demo workflow and the authenticated branch evolved independently. A merge that reinstates demo personas or local demo writes can silently bypass the authenticated care-record model. The architecture still is not permission to silently replace teammates' work.
 
 **How to apply:** Do not describe fixture extraction as general AI or client-side persona filtering as production authorization. Require review of ambiguous dates and preserve source evidence; unsupported text must not generate invented fixture facts.
 

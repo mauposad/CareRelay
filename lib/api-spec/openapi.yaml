@@ -10,6 +10,9 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+  - name: circles
+  - name: records
 paths:
   /healthz:
     get:
@@ -24,6 +27,146 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterInput" }
+      responses:
+        "201": { description: Registered, content: { application/json: { schema: { $ref: "#/components/schemas/SessionUser" } } } }
+        "409": { description: Conflict, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/sign-in:
+    post:
+      operationId: signIn
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthInput" }
+      responses:
+        "200": { description: Signed in, content: { application/json: { schema: { $ref: "#/components/schemas/SessionUser" } } } }
+        "401": { description: Invalid credentials, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/sign-out:
+    post:
+      operationId: signOut
+      tags: [auth]
+      responses: { "204": { description: Signed out } }
+  /auth/session:
+    get:
+      operationId: getSession
+      tags: [auth]
+      responses:
+        "200": { description: Current session, content: { application/json: { schema: { $ref: "#/components/schemas/SessionUser" } } } }
+        "401": { description: Unauthenticated, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /circles:
+    get:
+      operationId: listCircles
+      tags: [circles]
+      responses:
+        "200": { description: Circles, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Circle" } } } } }
+  /circles/{circleId}/records:
+    get:
+      operationId: listRecords
+      tags: [records]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Records, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CareRecord" } } } } }
+        "403": { description: Forbidden, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    post:
+      operationId: createRecord
+      tags: [records]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordInput" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/CareRecord" } } } }
+        "401": { description: Unauthenticated, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "403": { description: Forbidden, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /circles/{circleId}/approvals:
+    get:
+      operationId: listApprovals
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Approvals, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Approval" } } } } }
+    post:
+      operationId: createApproval
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalInput" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } }
+  /circles/{circleId}/approvals/{approvalId}/approve:
+    post:
+      operationId: approveRequest
+      tags: [circles]
+      parameters:
+        - { name: circleId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: approvalId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Approved, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } }
+        "409": { description: Stale approval, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /circles/{circleId}/approvals/{approvalId}/reject:
+    post:
+      operationId: rejectApproval
+      tags: [circles]
+      parameters:
+        - { name: circleId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: approvalId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Rejected, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } }
+  /circles/{circleId}/members:
+    get:
+      operationId: listMembers
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: Members, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Member" } } } } } }
+    post:
+      operationId: addMember
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MemberInput" } } } }
+      responses: { "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Member" } } } }, "202": { description: Pending approval, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } } }
+  /circles/{circleId}/members/{userId}:
+    delete:
+      operationId: removeMember
+      tags: [circles]
+      parameters:
+        - { name: circleId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { "204": { description: Removed }, "202": { description: Pending approval, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } } }
+  /circles/{circleId}/caretaker:
+    patch:
+      operationId: replaceCaretaker
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CaretakerInput" } } } }
+      responses: { "204": { description: Replaced } }
+  /circles/{circleId}/tier:
+    patch:
+      operationId: changeTier
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TierInput" } } } }
+      responses: { "200": { description: Changed }, "202": { description: Pending approval, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } } }
+  /circles/{circleId}/audit:
+    get:
+      operationId: listAudit
+      tags: [circles]
+      parameters: [{ name: circleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: Audit entries, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Audit" } } } } } }
 components:
   schemas:
     HealthStatus:
@@ -33,4 +176,102 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      required: [error]
+      properties: { error: { type: string } }
+    AuthInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10 }
+    RegisterInput:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10 }
+        displayName: { type: string, minLength: 1 }
+    SessionUser:
+      type: object
+      required: [id, email, displayName, circles]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        circles: { type: array, items: { $ref: "#/components/schemas/Circle" } }
+    Circle:
+      type: object
+      required: [id, name, recipientName, tier, role]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        recipientName: { type: string }
+        tier: { type: string, enum: [non_assisted, transitional, fully_assisted] }
+        role: { type: string, enum: [primary_user, primary_caretaker, primary_physician, family] }
+    CareRecord:
+      type: object
+      required: [id, kind, title, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string }
+        title: { type: string }
+        details: { type: ["string", "null"] }
+        dueAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    RecordInput:
+      type: object
+      required: [kind, title]
+      properties:
+        kind: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1 }
+        details: { type: string }
+        dueAt: { type: string, format: date-time }
+    Approval:
+      type: object
+      required: [id, circleId, action, status]
+      properties:
+        id: { type: string, format: uuid }
+        circleId: { type: string, format: uuid }
+        action: { type: string }
+        status: { type: string, enum: [pending, applied, rejected, expired] }
+    ApprovalInput:
+      type: object
+      required: [action, payload]
+      properties:
+        action: { type: string, enum: [create_record] }
+        payload: { type: object, additionalProperties: true }
+    Member:
+      type: object
+      required: [id, userId, role]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        displayName: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [primary_user, primary_caretaker, primary_physician, family] }
+    MemberInput:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, format: uuid }
+        role: { type: string, enum: [primary_user, primary_caretaker, primary_physician, family] }
+    CaretakerInput:
+      type: object
+      required: [userId]
+      properties: { userId: { type: string, format: uuid } }
+    TierInput:
+      type: object
+      required: [tier]
+      properties: { tier: { type: string, enum: [non_assisted, transitional, fully_assisted] } }
+    Audit:
+      type: object
+      required: [id, action, outcome, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string }
+        target: { type: ["string", "null"] }
+        outcome: { type: string }
+        createdAt: { type: string, format: date-time }
 

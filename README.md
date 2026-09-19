@@ -6,6 +6,8 @@ CareRelay turns family chat updates, voice notes, and clinical documents into st
 
 ## Quick start
 
+**Authenticated branch:** This branch uses sign-in and server-backed care-circle roles. Run the managed API and CareRelay workflows with a configured PostgreSQL database. The demo flow below describes the imported `main` experience, not a replacement for authenticated authorization. See [replit.md](replit.md) for this branch's run instructions and integration boundaries.
+
 ```bash
 pnpm install
 cp .env.example .env     # add ANTHROPIC_API_KEY for live extraction (optional)

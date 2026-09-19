@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
+import { authenticate } from "../lib/auth";
 import {
   CARE_MODEL,
   extractFromDocument,
@@ -8,6 +9,7 @@ import {
 } from "../lib/careExtraction";
 
 const router: IRouter = Router();
+router.use("/extract", authenticate);
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_DOCUMENT_TYPES = [
