@@ -245,6 +245,106 @@ describe.sequential("database-backed HTTP authorization boundary", () => {
     expect(activeCaretakers.map((membership) => membership.userId)).toEqual([replacement.id]);
   });
 
+  it("allows only one concurrent active assignment for each primary role", async () => {
+    for (const role of ["primary_user", "primary_caretaker", "primary_physician"] as const) {
+      const [circle] = await db.insert(circles).values({
+        name: `${prefix}-${role}-race`,
+        recipientName: `${role} race`,
+      }).returning();
+      circleIds.push(circle.id);
+      const first = await createUser(`${role}-race-first`);
+      const second = await createUser(`${role}-race-second`);
+
+      const results = await Promise.allSettled([
+        db.insert(memberships).values({ circleId: circle.id, userId: first.id, role }).returning(),
+        db.insert(memberships).values({ circleId: circle.id, userId: second.id, role }).returning(),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+      const active = await db.select().from(memberships).where(and(
+        eq(memberships.circleId, circle.id),
+        eq(memberships.role, role),
+        eq(memberships.active, true),
+      ));
+      expect(active).toHaveLength(1);
+    }
+  });
+
+  it("returns a conflict when direct membership creation duplicates an active primary role", async () => {
+    await setTier("non_assisted");
+    const candidate = await createUser("duplicate-primary-user");
+    const response = await request(`/circles/${circleA}/members`, {
+      token: actor("a", "primary_user").token,
+      method: "POST",
+      body: { userId: candidate.id, role: "primary_user" },
+    });
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toEqual({ error: "An active member already holds this primary role" });
+  });
+
+  it("keeps exactly one caretaker active during concurrent replacements", async () => {
+    const first = await createUser("concurrent-caretaker-first");
+    const second = await createUser("concurrent-caretaker-second");
+    const physicianToken = actor("a", "primary_physician").token;
+    const responses = await Promise.all([
+      request(`/circles/${circleA}/caretaker`, {
+        token: physicianToken,
+        method: "PATCH",
+        body: { userId: first.id },
+      }),
+      request(`/circles/${circleA}/caretaker`, {
+        token: physicianToken,
+        method: "PATCH",
+        body: { userId: second.id },
+      }),
+    ]);
+
+    expect(responses.some((response) => response.status === 204)).toBe(true);
+    expect(responses.every((response) => [204, 409].includes(response.status))).toBe(true);
+    const active = await db.select().from(memberships).where(and(
+      eq(memberships.circleId, circleA),
+      eq(memberships.role, "primary_caretaker"),
+      eq(memberships.active, true),
+    ));
+    expect(active).toHaveLength(1);
+    replacementCaretaker = [...fixtureUsers.values()].find((user) => user.id === active[0].userId)!;
+    expect(replacementCaretaker).toBeDefined();
+  });
+
+  it("rolls back approval application when its primary role conflicts", async () => {
+    await setTier("transitional");
+    const candidate = await createUser("approval-caretaker-conflict");
+    const created = await request(`/circles/${circleA}/approvals`, {
+      token: actor("a", "primary_user").token,
+      method: "POST",
+      body: { action: "member_add", payload: { userId: candidate.id, role: "primary_caretaker" } },
+    });
+    expect(created.status).toBe(201);
+    const approval = await json(created);
+    const approvalId = approval.id as string;
+
+    expect((await request(`/circles/${circleA}/approvals/${approvalId}/approve`, {
+      token: actor("a", "primary_user").token,
+      method: "POST",
+    })).status).toBe(200);
+    const conflicting = await request(`/circles/${circleA}/approvals/${approvalId}/approve`, {
+      token: replacementCaretaker.token,
+      method: "POST",
+    });
+    expect(conflicting.status).toBe(409);
+
+    const [stored] = await db.select().from(approvalRequests).where(eq(approvalRequests.id, approvalId));
+    expect(stored.status).toBe("pending");
+    expect(stored.caretakerApprovedAt).toBeNull();
+    const [candidateMembership] = await db.select().from(memberships).where(and(
+      eq(memberships.circleId, circleA),
+      eq(memberships.userId, candidate.id),
+    ));
+    expect(candidateMembership).toBeUndefined();
+  });
+
   it("rejects expired and revoked real sessions", async () => {
     const expiredUser = await createUser("expired-session");
     await db.update(sessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(sessions.userId, expiredUser.id));

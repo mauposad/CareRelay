@@ -5,6 +5,7 @@ import { authenticate, type AuthenticatedRequest } from "../lib/auth";
 import { deny, membershipFor, canManageMembership, requiresDualApproval } from "../lib/policy";
 import { approvalRequests } from "@workspace/db";
 import { z } from "zod";
+import { activePrimaryRoleConflictBody, isActivePrimaryRoleConflict } from "../lib/membership-conflict";
 
 const router: IRouter = Router();
 const memberInput = z.object({ userId: z.string().uuid(), role: z.enum(["primary_user", "primary_caretaker", "primary_physician", "family"]) });
@@ -32,9 +33,17 @@ router.post("/circles/:circleId/members", authenticate, async (req, res): Promis
     }
     deny(res); return;
   }
-  const [created] = await db.insert(memberships).values({ circleId, userId: parsed.data.userId, role: parsed.data.role }).onConflictDoUpdate({ target: [memberships.circleId, memberships.userId], set: { role: parsed.data.role, active: true } }).returning();
-  await db.insert(auditEntries).values({ actorId: authReq.user.id, circleId, action: "member_add", target: created.id, outcome: "allowed" });
-  res.status(201).json(created);
+  try {
+    const [created] = await db.insert(memberships).values({ circleId, userId: parsed.data.userId, role: parsed.data.role }).onConflictDoUpdate({ target: [memberships.circleId, memberships.userId], set: { role: parsed.data.role, active: true } }).returning();
+    await db.insert(auditEntries).values({ actorId: authReq.user.id, circleId, action: "member_add", target: created.id, outcome: "allowed" });
+    res.status(201).json(created);
+  } catch (error) {
+    if (isActivePrimaryRoleConflict(error)) {
+      res.status(409).json(activePrimaryRoleConflictBody);
+      return;
+    }
+    throw error;
+  }
 });
 
 router.delete("/circles/:circleId/members/:userId", authenticate, async (req, res): Promise<void> => {
@@ -65,12 +74,20 @@ router.patch("/circles/:circleId/caretaker", authenticate, async (req, res): Pro
   const parsed = z.object({ userId: z.string().uuid() }).safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   if (!relation || relation.membership.role !== "primary_physician") { deny(res); return; }
-  await db.transaction(async (tx) => {
-    await tx.update(memberships).set({ active: false }).where(and(eq(memberships.circleId, circleId), eq(memberships.role, "primary_caretaker")));
-    await tx.insert(memberships).values({ circleId, userId: parsed.data.userId, role: "primary_caretaker" }).onConflictDoUpdate({ target: [memberships.circleId, memberships.userId], set: { role: "primary_caretaker", active: true } });
-    await tx.insert(auditEntries).values({ actorId: authReq.user.id, circleId, action: "caretaker_replace", target: parsed.data.userId, outcome: "allowed" });
-  });
-  res.sendStatus(204);
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(memberships).set({ active: false }).where(and(eq(memberships.circleId, circleId), eq(memberships.role, "primary_caretaker"), eq(memberships.active, true)));
+      await tx.insert(memberships).values({ circleId, userId: parsed.data.userId, role: "primary_caretaker" }).onConflictDoUpdate({ target: [memberships.circleId, memberships.userId], set: { role: "primary_caretaker", active: true } });
+      await tx.insert(auditEntries).values({ actorId: authReq.user.id, circleId, action: "caretaker_replace", target: parsed.data.userId, outcome: "allowed" });
+    });
+    res.sendStatus(204);
+  } catch (error) {
+    if (isActivePrimaryRoleConflict(error)) {
+      res.status(409).json(activePrimaryRoleConflictBody);
+      return;
+    }
+    throw error;
+  }
 });
 
 router.patch("/circles/:circleId/tier", authenticate, async (req, res): Promise<void> => {

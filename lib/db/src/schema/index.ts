@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid, boolean, integer, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -36,7 +37,13 @@ export const memberships = pgTable("circle_memberships", {
   role: text("role", { enum: ["primary_user", "primary_caretaker", "primary_physician", "family"] }).notNull(),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [uniqueIndex("circle_member_unique").on(t.circleId, t.userId), index("membership_user_idx").on(t.userId)]);
+}, (t) => [
+  uniqueIndex("circle_member_unique").on(t.circleId, t.userId),
+  uniqueIndex("circle_active_primary_role_unique")
+    .on(t.circleId, t.role)
+    .where(sql`${t.active} = true and ${t.role} in ('primary_user', 'primary_caretaker', 'primary_physician')`),
+  index("membership_user_idx").on(t.userId),
+]);
 
 export const careRecords = pgTable("care_records", {
   id: uuid("id").defaultRandom().primaryKey(),
