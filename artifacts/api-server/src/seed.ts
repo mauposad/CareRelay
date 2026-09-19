@@ -1,4 +1,4 @@
-import { db, users, circles, memberships, careRecords } from "@workspace/db";
+import { db, users, circles, memberships, careRecords, closeDatabase } from "@workspace/db";
 import { hashPassword } from "./lib/auth";
 
 /**
@@ -29,4 +29,4 @@ if (circle) {
   }
   await db.insert(careRecords).values({ circleId: circle.id, createdBy: existing[0].id, kind: "appointment", title: "Primary care follow-up", details: "Bring current status update.", sensitive: false });
 }
-await db.$client.end();
+await closeDatabase();

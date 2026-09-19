@@ -49,6 +49,8 @@ export type CareTask = {
   recurrence?: string; // e.g. "daily", "weekly"
   dueAt?: string;
   assignedTo?: string;
+  /** Display name of the assignee, resolved by the server. */
+  assigneeName?: string;
   status: CareTaskStatus;
   confirmationRequired: boolean;
   sourceEventId?: string;

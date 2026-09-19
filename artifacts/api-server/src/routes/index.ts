@@ -6,6 +6,7 @@ import approvalsRouter from "./approvals";
 import membersRouter from "./members";
 import auditRouter from "./audit";
 import extractRouter from "./extract";
+import careRouter from "./care";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(approvalsRouter);
 router.use(membersRouter);
 router.use(auditRouter);
 router.use(extractRouter);
+router.use(careRouter);
 
 export default router;

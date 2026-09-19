@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '../store/AuthContext';
-import { extractDocument, type ApiExtractionResponse } from '../lib/api';
+import { type ApiExtractionResponse } from '../lib/api';
+import { useCareContext } from '../store/CareContext';
+import { Link } from 'wouter';
 import { CareEvent, CareEventType } from '../types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +12,7 @@ import {
   FileCheck2, FileText, Loader2, LockKeyhole, Pill, RotateCcw, ShieldCheck, Sparkles, Upload, X,
 } from 'lucide-react';
 
-type Phase = 'idle' | 'processing' | 'review';
+type Phase = 'idle' | 'processing' | 'review' | 'complete';
 type ItemStatus = 'pending' | 'approved' | 'rejected';
 
 type ReviewItem = {
@@ -44,6 +46,9 @@ function typeIcon(type: CareEventType) {
 
 export default function DocumentsPage() {
   const { user, activeCircle } = useAuth();
+  const { extractDocumentFile, acceptDocumentEvents } = useCareContext();
+  const [carriedCount, setCarriedCount] = useState(0);
+  const [carrying, setCarrying] = useState(false);
   const [lastExtraction, setLastExtraction] = useState<ApiExtractionResponse | null>(null);
 
   const [phase, setPhase] = useState<Phase>('idle');
@@ -82,7 +87,7 @@ export default function DocumentsPage() {
     setPhase('processing');
 
     try {
-      const result = await extractDocument(file);
+      const result = await extractDocumentFile(file);
       if (result.mode !== 'ai') {
         throw new Error(result.fallbackReason
           ? `Live extraction unavailable: ${result.fallbackReason}. Sample findings are not shown for uploaded documents.`
@@ -142,7 +147,21 @@ export default function DocumentsPage() {
 
   const approvedItems = items.filter(item => item.status === 'approved');
 
+  const carryForward = async () => {
+    setCarrying(true);
+    try {
+      const count = await acceptDocumentEvents(approvedItems.map(item => item.event), sourceName);
+      setCarriedCount(count);
+      setPhase('complete');
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : 'Could not carry these findings forward.');
+    } finally {
+      setCarrying(false);
+    }
+  };
+
   const reset = () => {
+    setCarriedCount(0);
     setPhase('idle');
     setItems([]);
     setSourceName('');
@@ -373,19 +392,53 @@ export default function DocumentsPage() {
                     <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <div className="font-medium">
-                        {approvedItems.length} {approvedItems.length === 1 ? 'finding' : 'findings'} marked reviewed locally
+                        {approvedItems.length} {approvedItems.length === 1 ? 'finding' : 'findings'} ready to carry forward
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Preview only. Carry-forward to server-backed records and approval workflows is not available.
+                        Approved findings become proposed events on the care dashboard for final confirmation.
                       </div>
                     </div>
                   </div>
-                  <Button onClick={reset} variant="outline" className="gap-1 shrink-0" data-testid="button-reset-document">
-                    <RotateCcw className="w-4 h-4" /> Clear preview
-                  </Button>
+                  <div className="flex gap-2 shrink-0">
+                    <Button onClick={reset} variant="outline" className="gap-1" data-testid="button-reset-document">
+                      <RotateCcw className="w-4 h-4" /> Clear
+                    </Button>
+                    <Button
+                      onClick={() => void carryForward()}
+                      disabled={approvedItems.length === 0 || carrying}
+                      className="gap-1"
+                      data-testid="button-carry-forward"
+                    >
+                      {carrying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Carry forward <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </>
+          )}
+
+          {phase === 'complete' && (
+            <Card>
+              <CardContent className="p-12 text-center space-y-4" data-testid="status-document-complete">
+                <ShieldCheck className="w-9 h-9 mx-auto text-primary" />
+                <h2 className="font-serif text-2xl">Added to the care record</h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  {carriedCount} reviewed {carriedCount === 1 ? 'finding' : 'findings'} from{' '}
+                  <strong className="text-foreground">{sourceName}</strong>{' '}
+                  {carriedCount === 1 ? 'is' : 'are'} now waiting for confirmation on the care dashboard,
+                  each with its source quote attached.
+                </p>
+                <div className="flex flex-wrap gap-3 justify-center pt-2">
+                  <Button asChild className="gap-1">
+                    <Link href="/dashboard">Review on the dashboard <ArrowRight className="w-4 h-4" /></Link>
+                  </Button>
+                  <Button variant="outline" onClick={reset} className="gap-1">
+                    <RotateCcw className="w-3.5 h-3.5" /> Review another document
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
         </div>

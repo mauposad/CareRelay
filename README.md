@@ -10,21 +10,38 @@ CareRelay turns family chat updates, voice notes, and clinical documents into st
 
 ```bash
 pnpm install
-cp .env.example .env     # add ANTHROPIC_API_KEY for live extraction (optional)
 ./scripts/dev.sh
 ```
 
-Open http://localhost:5180.
+Open http://localhost:5180 and sign in as **sarah@carerelay.demo** / **carerelay-demo**.
 
-Without an API key the app still runs end to end using deterministic demo data, and every screen labels itself "Demo extraction (no API key)".
+No database to install and nothing to configure: with no `DATABASE_URL` the API
+runs an embedded Postgres, migrates it, and seeds the Wilson family circle.
+Add `ANTHROPIC_API_KEY` to `.env` for live AI extraction — without it the app
+still runs end to end on deterministic demo data and labels every screen
+"Demo extraction (no API key)". `./scripts/dev.sh --reset` gives you a clean
+circle between demo runs.
+
+### Demo accounts
+
+All use the password `carerelay-demo`.
+
+| Account | Role | Sees |
+|---|---|---|
+| `sarah@carerelay.demo` | Primary caregiver | Everything: ingest, confirm, assign rides |
+| `john@carerelay.demo` | Family support | Only his own tasks and rides |
+| `margaret@carerelay.demo` | Care recipient | A simple daily plan |
+| `patel@carerelay.demo` | Physician | Only explicitly shared observations — no rides |
+| `alex@carerelay.demo`, `emily@carerelay.demo` | Family | Their own assignments |
 
 ## The demo flow
 
 1. **Pick a role** on the landing page (start with Sarah Wilson, Primary Caregiver).
 2. **Paste an update** — "Try sample update" loads `PT moved to Friday at 10. John can drive. Mom felt tired after breakfast.` Extraction splits it into an appointment, an assigned task, and a reported observation, each with the quote it came from.
-3. **Or upload a document** — "Open document intake" → "Load sample visit summary" runs a real PDF through the same pipeline. Approve the findings you want to carry forward.
-4. **Resolve and confirm** — missing times must be set by a person before an event becomes a task.
-5. **Switch roles** — the physician sees only explicitly shared observations; John sees only his assigned logistics; Margaret sees a simple daily plan.
+3. **Arrange the ride** — Friday's physical therapy has no driver. Ask John; sign in as John and accept, or decline with a reason and watch it return to the board so Sarah can hand it to Alex. The card keeps the whole chain.
+4. **Or upload a document** — "Open document intake" → "Load sample visit summary" runs a real PDF through the same pipeline. Approve the findings you want to carry forward.
+5. **Resolve and confirm** — missing times must be set by a person before an event becomes a task.
+6. **Switch roles** — the physician sees only explicitly shared observations; John sees only his assigned logistics; Margaret sees a simple daily plan.
 
 ## Architecture
 
@@ -39,7 +56,9 @@ care document (PDF/JPG/PNG)  ─┴─→ POST /api/extract/document  ─┤
                                                                ↓
                                        human confirmation (time, owner, sharing)
                                                                ↓
-                                     tasks + role-filtered views (RBAC)
+                              tasks + rides + role-filtered views (RBAC)
+                                                               ↓
+                     ride needs a driver → offered → accepted / declined → handed off
 ```
 
 - `artifacts/api-server` — Express API and the extraction service

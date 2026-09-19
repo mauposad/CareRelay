@@ -9,7 +9,7 @@ import {
   circles,
   db,
   memberships,
-  pool,
+  closeDatabase,
   sessions,
   users,
 } from "@workspace/db";
@@ -154,7 +154,7 @@ afterAll(async () => {
   if (ids.length) await db.delete(users).where(inArray(users.id, ids));
   if (circleIds.length) await db.delete(circles).where(inArray(circles.id, circleIds));
   if (server) await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  await pool.end();
+  await closeDatabase();
 });
 
 describe.sequential("database-backed HTTP authorization boundary", () => {

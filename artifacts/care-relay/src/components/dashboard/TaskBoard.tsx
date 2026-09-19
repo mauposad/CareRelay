@@ -8,7 +8,7 @@ import { ROLE } from '../../lib/rbac';
 import { formatTimeline } from '../../lib/dateUtils';
 
 export function TaskBoard() {
-  const { state, currentPersona, updateTaskStatus } = useCareContext();
+  const { state, currentPersona, updateTaskStatus, acceptTask, reassignTask, members } = useCareContext();
   
   const tasks = state.tasks.filter(t => t.status !== 'cancelled');
   
@@ -29,7 +29,7 @@ export function TaskBoard() {
           <div className="text-xs text-muted-foreground flex items-center gap-2">
             {task.dueAt && <span>{formatTimeline(task.dueAt)}</span>}
             {task.recurrence && <span className="uppercase text-[10px] bg-secondary px-1.5 rounded">{task.recurrence}</span>}
-            {task.assignedTo && !isMine && <span className="capitalize text-primary">• {task.assignedTo}</span>}
+            {task.assignedTo && !isMine && <span className="text-primary">• {task.assigneeName ?? 'Assigned'}</span>}
             {isAccepted && !isCompleted && <span className="text-secondary font-medium flex items-center gap-1"><Handshake className="w-3 h-3" /> Accepted</span>}
           </div>
         </div>
@@ -42,11 +42,11 @@ export function TaskBoard() {
           ) : (
             <>
               {isMine && !isAccepted ? (
-                <Button size="sm" variant="default" className="h-8 px-3 text-xs" onClick={() => updateTaskStatus(task.id, task.status, { acceptedAt: new Date().toISOString(), acceptedBy: currentPersona.id })}>
+                <Button size="sm" variant="default" className="h-8 px-3 text-xs" onClick={() => void acceptTask(task.id)}>
                   Accept
                 </Button>
               ) : isMine ? (
-                <Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => updateTaskStatus(task.id, 'confirmed')}>
+                <Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => void updateTaskStatus(task.id, 'confirmed')}>
                   Done
                 </Button>
               ) : null}
@@ -73,12 +73,13 @@ export function TaskBoard() {
                     {!isSupport && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => updateTaskStatus(task.id, task.status, { assignedTo: 'john', acceptedAt: undefined, acceptedBy: undefined })}>
-                          <UserPlus className="w-4 h-4 mr-2" /> Reassign to John
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => updateTaskStatus(task.id, task.status, { assignedTo: 'sarah', acceptedAt: undefined, acceptedBy: undefined })}>
-                          <UserPlus className="w-4 h-4 mr-2" /> Reassign to Sarah
-                        </DropdownMenuItem>
+                        {members
+                          .filter((member) => member.role !== 'primary_physician' && member.userId !== task.assignedTo)
+                          .map((member) => (
+                            <DropdownMenuItem key={member.userId} onClick={() => void reassignTask(task.id, member.userId)}>
+                              <UserPlus className="w-4 h-4 mr-2" /> Reassign to {member.displayName}
+                            </DropdownMenuItem>
+                          ))}
                       </>
                     )}
                   </DropdownMenuContent>

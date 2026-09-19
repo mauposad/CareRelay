@@ -17,7 +17,9 @@ import DashboardRouter from './pages/DashboardRouter';
 import SettingsPage from './pages/SettingsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import AuthPage from './pages/AuthPage';
+import RecordsPage from './pages/RecordsPage';
 import { AuthProvider, useAuth } from './store/AuthContext';
+import { CareProvider } from './store/CareContext';
 
 const queryClient = new QueryClient();
 
@@ -27,19 +29,22 @@ function Router() {
   if (!user) return <AppLayout><AuthPage /></AppLayout>;
   if (error) return <AppLayout><div className="py-20 text-center text-destructive" data-testid="status-auth-error">{error}</div></AppLayout>;
   return (
-    <RoutedErrorBoundary>
-      <AppLayout>
+    <CareProvider key={`${user.id}:${activeCircle?.id ?? ''}`}>
+      <RoutedErrorBoundary>
+        <AppLayout>
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/dashboard" component={DashboardRouter} />
           <Route path="/documents">
             <DocumentsPage key={`${user.id}:${activeCircle?.id ?? ''}:${activeCircle?.role ?? ''}`} />
           </Route>
+          <Route path="/records" component={RecordsPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
-        </Switch>
-      </AppLayout>
-    </RoutedErrorBoundary>
+          </Switch>
+        </AppLayout>
+      </RoutedErrorBoundary>
+    </CareProvider>
   );
 }
 

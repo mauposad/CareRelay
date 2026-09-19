@@ -3,7 +3,7 @@ import { useCareContext } from '../../store/CareContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, AlertTriangle, Calendar, Clock, CheckSquare, Activity, ShieldAlert } from 'lucide-react';
+import { Check, X, AlertTriangle, Calendar, Clock, CheckSquare, Activity, ShieldAlert, Car, Loader2 } from 'lucide-react';
 import { CareEvent, CareEventType } from '../../types';
 import { formatTimeline, createNYDateISO, getNowInNY, nyIsoFromWallClock, nyWallClockNow } from '../../lib/dateUtils';
 import { canUser, PERMISSIONS } from '../../lib/rbac';
@@ -14,6 +14,8 @@ export function ProposedEvents() {
   const [timeSelections, setTimeSelections] = useState<Record<string, string>>({});
   const [wallClockSelections, setWallClockSelections] = useState<Record<string, string>>({});
   const [sharingSelections, setSharingSelections] = useState<Record<string, boolean>>({});
+  const [rideSelections, setRideSelections] = useState<Record<string, boolean>>({});
+  const [confirming, setConfirming] = useState<string | null>(null);
   
   const proposed = state.events.filter(e => e.status === 'proposed');
 
@@ -63,11 +65,17 @@ export function ProposedEvents() {
     }
   };
 
-  const handleConfirm = (eventId: string) => {
-    confirmEvent(eventId, { 
-       ...(timeSelections[eventId] ? { datetime: timeSelections[eventId] } : {}),
-       sharedWithPhysician: sharingSelections[eventId] || false
-    });
+  const handleConfirm = async (eventId: string) => {
+    setConfirming(eventId);
+    try {
+      await confirmEvent(eventId, {
+        ...(timeSelections[eventId] ? { datetime: timeSelections[eventId] } : {}),
+        sharedWithPhysician: sharingSelections[eventId] || false,
+        ...(rideSelections[eventId] ? { needsRide: true } : {}),
+      });
+    } finally {
+      setConfirming(null);
+    }
   };
 
   const canViewRaw = canUser(currentPersona.role, PERMISSIONS.VIEW_SOURCE_CONTEXT);
@@ -161,6 +169,20 @@ export function ProposedEvents() {
                     </div>
                   )}
 
+                  {event.type === 'appointment' && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        variant={rideSelections[event.id] ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        onClick={() => setRideSelections(prev => ({ ...prev, [event.id]: !prev[event.id] }))}
+                      >
+                        <Car className="w-3 h-3 mr-1" />
+                        {rideSelections[event.id] ? 'Will arrange a ride' : 'Needs a ride?'}
+                      </Button>
+                    </div>
+                  )}
+
                   {event.type === 'symptom' && canUser(currentPersona.role, PERMISSIONS.SHARE_WITH_PHYSICIAN) && (
                     <div className="mt-3 flex items-center gap-2">
                       <Button 
@@ -178,16 +200,16 @@ export function ProposedEvents() {
               </div>
               
               <div className="flex items-center gap-2 shrink-0">
-                <Button size="icon" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => rejectEvent(event.id)}>
+                <Button size="icon" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void rejectEvent(event.id)}>
                   <X className="w-4 h-4" />
                 </Button>
                 <Button 
                   size="sm" 
                   className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90" 
-                  onClick={() => handleConfirm(event.id)}
-                  disabled={event.unresolvedTime && !timeSelections[event.id]}
+                  onClick={() => void handleConfirm(event.id)}
+                  disabled={(event.unresolvedTime && !timeSelections[event.id]) || confirming === event.id}
                 >
-                  <Check className="w-4 h-4" />
+                  {confirming === event.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Confirm
                 </Button>
               </div>
