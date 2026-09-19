@@ -2,4 +2,4 @@
 Buildathon w/ Replit
 
 
-Test Test. Go Ahead for Jonathon
+Test Test. Go Ahead for Jonathan
