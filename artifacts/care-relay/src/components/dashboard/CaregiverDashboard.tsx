@@ -4,6 +4,7 @@ import { MessageIngest } from './MessageIngest';
 import { ProposedEvents } from './ProposedEvents';
 import { Timeline } from './Timeline';
 import { TaskBoard } from './TaskBoard';
+import { RideBoard } from './RideBoard';
 import { ROLE, canUser, PERMISSIONS } from '../../lib/rbac';
 import { getRoleSpecificSummary } from '../../store/selectors';
 import { Button } from '@/components/ui/button';
@@ -55,7 +56,7 @@ export function CaregiverDashboard() {
         
         <div className="space-y-1 mb-6">
           <h1 className="text-3xl font-serif">Care Center</h1>
-          <p className="text-muted-foreground">Organizing updates for Margaret Wilson</p>
+          <p className="text-muted-foreground">Organizing updates for {state.profile.displayName}</p>
         </div>
 
         {canEdit && <MessageIngest />}
@@ -78,6 +79,8 @@ export function CaregiverDashboard() {
           </Card>
         )}
         {canEdit && <ProposedEvents />}
+
+        <RideBoard />
         
         {canUser(currentPersona.role, PERMISSIONS.VIEW_ALL_STRUCTURED_EVENTS) && <Timeline />}
       </div>

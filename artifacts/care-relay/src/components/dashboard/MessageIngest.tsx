@@ -10,7 +10,7 @@ import { MessageSource } from '../../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function MessageIngest() {
-  const { ingestMessage, isProcessing, currentPersona, extractionStatus, lastExtraction } = useCareContext();
+  const { ingestMessage, isProcessing, extractionStatus, lastExtraction } = useCareContext();
   const [text, setText] = useState('');
   const [source, setSource] = useState<MessageSource>('whatsapp');
   const [isRecording, setIsRecording] = useState(false);
@@ -18,7 +18,7 @@ export function MessageIngest() {
 
   const handleTextSubmit = async () => {
     if (!text.trim() || isProcessing) return;
-    await ingestMessage(text, source, currentPersona.id);
+    await ingestMessage(text, source);
     setText('');
   };
 

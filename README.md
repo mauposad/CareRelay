@@ -314,20 +314,42 @@ The team should prioritize a reliable end-to-end workflow before adding stretch 
 
 ---
 
+## Running the Demo
+
+```bash
+pnpm install
+./scripts/dev.sh
+```
+
+Then open http://localhost:5180 and sign in as `sarah@carerelay.demo` /
+`carerelay-demo`.
+
+Nothing else to install. With no `DATABASE_URL` the API runs an embedded
+Postgres under `.data/`, applies migrations and seeds the demo circle on
+startup. `./scripts/dev.sh --reset` wipes it for a clean run between demos.
+
+Set `ANTHROPIC_API_KEY` in `.env` for live AI extraction. Without it the app
+still runs end to end on deterministic demo data and labels each screen
+"Demo extraction (no API key)".
+
+---
+
 ## Demo Accounts
 
-Use the following demo accounts for testing the role-based CareRelay experience:
+`./scripts/dev.sh` seeds the Wilson family care circle. All accounts use the
+password `carerelay-demo`.
 
-| Role | Email |
-|---|---|
-| Primary | `primary@example.test` |
-| Caretaker | `caretaker@example.test` |
-| Physician | `physician@example.test` |
-| Family | `family@example.test` |
+| Account | Role | What they see |
+|---|---|---|
+| `sarah@carerelay.demo` | Primary caregiver | Everything: import updates, confirm events, assign rides |
+| `john@carerelay.demo` | Family support | Only his own tasks and the rides he is asked to drive |
+| `margaret@carerelay.demo` | Care recipient | A simple daily plan |
+| `patel@carerelay.demo` | Physician | Only explicitly shared observations — never rides or family logistics |
+| `alex@carerelay.demo` | Family support | His own assignments |
+| `emily@carerelay.demo` | Family | Her own assignments |
 
-**Demo password for all accounts:** `Buildathon123!`
-
-These accounts can be used to demonstrate how CareRelay presents different information and actions to different participants in the care workflow.
+Visibility is enforced by the server, not hidden in the UI, so signing in as
+each person genuinely shows a different care circle.
 
 
 ---

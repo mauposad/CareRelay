@@ -42,3 +42,68 @@ export const CARE_KINDS = ["document", "appointment", "medicine", "diet", "exerc
 export function familyVisibleKind(kind: string): boolean {
   return ["appointment", "status", "recovery", "rehab", "current_status"].includes(kind);
 }
+
+/* ------------------------------------------------------------------ *
+ * Care coordination + ride logistics
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who may confirm extracted events, create rides and assign drivers.
+ * Mirrors canWrite: the person responsible for the care record at this tier.
+ */
+export function canCoordinate(role: string, tier: string): boolean {
+  return canWrite(role, tier);
+}
+
+/**
+ * Ride logistics are family coordination, not clinical information, so the
+ * physician does not see them. Everyone else in the circle does, because the
+ * family members are the pool of drivers.
+ */
+export function canSeeRides(role: string): boolean {
+  return role !== "primary_physician";
+}
+
+/** A driver may act on their own ride; coordinators may act on any ride. */
+export function canActOnRide(
+  role: string,
+  tier: string,
+  driverId: string | null,
+  userId: string,
+): boolean {
+  if (driverId && driverId === userId) return true;
+  return canCoordinate(role, tier);
+}
+
+type VisibilityEvent = {
+  type: string;
+  status: string;
+  sharedWithPhysician: boolean;
+  ownerId: string | null;
+};
+
+/**
+ * Role-filtered event visibility — the product's core promise that each
+ * person sees only what they need.
+ *
+ * - physician: confirmed clinical signals, and symptoms only when a caregiver
+ *   explicitly shared them.
+ * - family: schedule and the work assigned to them, never symptom reports.
+ * - primary user / caretaker: the full record.
+ */
+export function canSeeEvent(role: string, userId: string, event: VisibilityEvent): boolean {
+  if (role === "primary_physician") {
+    if (event.status !== "confirmed") return false;
+    if (event.type === "symptom") return event.sharedWithPhysician;
+    return ["medication", "appointment"].includes(event.type);
+  }
+
+  if (role === "family") {
+    if (event.type === "symptom") return false;
+    if (event.status !== "confirmed") return false;
+    if (event.type === "appointment") return true;
+    return event.ownerId === userId;
+  }
+
+  return true;
+}

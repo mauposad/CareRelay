@@ -95,3 +95,183 @@ export async function extractDocument(file: File): Promise<ApiExtractionResponse
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as ApiExtractionResponse;
 }
+
+/* ------------------------------------------------------------------ *
+ * Care coordination + ride logistics.
+ *
+ * These endpoints are not in the generated OpenAPI client, so they are
+ * hand-written here alongside the extraction calls. Cookies carry the
+ * session, so every call sends credentials.
+ * ------------------------------------------------------------------ */
+
+export type ServerCareEvent = {
+  id: string;
+  type: 'task' | 'appointment' | 'note' | 'medication' | 'exercise' | 'check_in' | 'symptom';
+  summary: string;
+  ownerId: string | null;
+  scheduledAt: string | null;
+  status: 'proposed' | 'confirmed' | 'rejected';
+  confidence: number;
+  evidence: string;
+  unresolvedTime: boolean;
+  recurrence: string | null;
+  sharedWithPhysician: boolean;
+  extractionMode: ExtractionMode | 'manual';
+  messageId: string | null;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+  createdAt: string;
+};
+
+export type ServerCareTask = {
+  id: string;
+  eventId: string | null;
+  title: string;
+  category: string;
+  assignedTo: string | null;
+  assigneeName: string | null;
+  dueAt: string | null;
+  status: 'scheduled' | 'accepted' | 'done' | 'declined' | 'cancelled';
+  recurrence: string | null;
+  acceptedAt: string | null;
+  completedAt: string | null;
+};
+
+export type RideStatus = 'needs_driver' | 'offered' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+
+export type RideHistoryEntry = {
+  id: string;
+  action: string;
+  detail: string | null;
+  actorName: string | null;
+  createdAt: string;
+};
+
+export type ServerRide = {
+  id: string;
+  eventId: string | null;
+  purpose: string;
+  pickupAt: string | null;
+  pickupLocation: string | null;
+  dropoffLocation: string | null;
+  status: RideStatus;
+  driverId: string | null;
+  driverName: string | null;
+  declineReason: string | null;
+  notes: string | null;
+  history: RideHistoryEntry[];
+};
+
+export type CircleMember = {
+  userId: string;
+  displayName: string;
+  email: string;
+  role: string;
+};
+
+export type IngestResponse = {
+  mode: ExtractionMode;
+  fallbackReason?: string;
+  unresolved: string[];
+  events: ServerCareEvent[];
+};
+
+async function callApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await withTimeout((signal) =>
+    fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+      signal,
+      ...init,
+    }),
+  );
+  if (!response.ok) throw new Error(await readError(response));
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+export const careApi = {
+  listEvents: (circleId: string) =>
+    callApi<ServerCareEvent[]>(`/circles/${circleId}/events`),
+
+  listTasks: (circleId: string) =>
+    callApi<ServerCareTask[]>(`/circles/${circleId}/tasks`),
+
+  listMessages: (circleId: string) =>
+    callApi<{ id: string; source: string; body: string; receivedAt: string; senderId: string | null; senderName: string | null }[]>(
+      `/circles/${circleId}/messages`,
+    ),
+
+  listRides: (circleId: string) =>
+    callApi<ServerRide[]>(`/circles/${circleId}/rides`),
+
+  listMembers: (circleId: string) =>
+    callApi<CircleMember[]>(`/circles/${circleId}/members`),
+
+  ingestMessage: (circleId: string, text: string, source: string) =>
+    callApi<IngestResponse>(`/circles/${circleId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text, source }),
+    }),
+
+  addEvents: (
+    circleId: string,
+    events: unknown[],
+    sourceLabel: string,
+    extractionMode: ExtractionMode | 'manual',
+  ) =>
+    callApi<{ events: ServerCareEvent[] }>(`/circles/${circleId}/events`, {
+      method: 'POST',
+      body: JSON.stringify({ events, sourceLabel, extractionMode }),
+    }),
+
+  confirmEvent: (
+    circleId: string,
+    eventId: string,
+    body: { scheduledAt?: string | null; ownerId?: string | null; sharedWithPhysician?: boolean; needsRide?: boolean },
+  ) =>
+    callApi<{ event: ServerCareEvent }>(`/circles/${circleId}/events/${eventId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  rejectEvent: (circleId: string, eventId: string) =>
+    callApi<ServerCareEvent>(`/circles/${circleId}/events/${eventId}/reject`, { method: 'POST' }),
+
+  shareEvent: (circleId: string, eventId: string, shared: boolean) =>
+    callApi<ServerCareEvent>(`/circles/${circleId}/events/${eventId}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ shared }),
+    }),
+
+  updateTask: (
+    circleId: string,
+    taskId: string,
+    body: { status?: string; assignedTo?: string | null },
+  ) =>
+    callApi<ServerCareTask>(`/circles/${circleId}/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  createRide: (circleId: string, body: Record<string, unknown>) =>
+    callApi<ServerRide>(`/circles/${circleId}/rides`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  assignRide: (circleId: string, rideId: string, driverId: string) =>
+    callApi<ServerRide>(`/circles/${circleId}/rides/${rideId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ driverId }),
+    }),
+
+  respondToRide: (circleId: string, rideId: string, accept: boolean, reason?: string) =>
+    callApi<ServerRide>(`/circles/${circleId}/rides/${rideId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ accept, reason }),
+    }),
+
+  completeRide: (circleId: string, rideId: string) =>
+    callApi<ServerRide>(`/circles/${circleId}/rides/${rideId}/complete`, { method: 'POST' }),
+};

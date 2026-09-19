@@ -83,6 +83,101 @@ export const auditEntries = pgTable("audit_entries", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("audit_circle_idx").on(t.circleId, t.createdAt)]);
 
+/* ------------------------------------------------------------------ *
+ * Care coordination: ingested messages, extracted events, the tasks
+ * they create, and the ride logistics that carry them out.
+ * ------------------------------------------------------------------ */
+
+export const careMessages = pgTable("care_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  circleId: uuid("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  senderId: uuid("sender_id").references(() => users.id),
+  source: text("source", { enum: ["whatsapp", "imessage", "sms", "email", "internal", "voice", "document"] }).notNull(),
+  body: text("body").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("messages_circle_idx").on(t.circleId, t.receivedAt)]);
+
+export const careEvents = pgTable("care_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  circleId: uuid("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  messageId: uuid("message_id").references(() => careMessages.id, { onDelete: "set null" }),
+  type: text("type", { enum: ["task", "appointment", "note", "medication", "exercise", "check_in", "symptom"] }).notNull(),
+  summary: text("summary").notNull(),
+  ownerId: uuid("owner_id").references(() => users.id),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  status: text("status", { enum: ["proposed", "confirmed", "rejected"] }).notNull().default("proposed"),
+  // Stored 0-100 so the column stays integral; the API exposes 0-1.
+  confidence: integer("confidence").notNull().default(60),
+  evidence: text("evidence").notNull().default(""),
+  unresolvedTime: boolean("unresolved_time").notNull().default(false),
+  recurrence: text("recurrence"),
+  sharedWithPhysician: boolean("shared_with_physician").notNull().default(false),
+  extractionMode: text("extraction_mode", { enum: ["ai", "mock", "manual"] }).notNull().default("manual"),
+  createdBy: uuid("created_by").references(() => users.id),
+  confirmedBy: uuid("confirmed_by").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("events_circle_idx").on(t.circleId, t.status)]);
+
+export const careTasks = pgTable("care_tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  circleId: uuid("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  eventId: uuid("event_id").references(() => careEvents.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  category: text("category", { enum: ["medication", "exercise", "appointment", "check_in", "nutrition", "transport", "other"] }).notNull().default("other"),
+  assignedTo: uuid("assigned_to").references(() => users.id),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  status: text("status", { enum: ["scheduled", "accepted", "done", "declined", "cancelled"] }).notNull().default("scheduled"),
+  recurrence: text("recurrence"),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("tasks_circle_idx").on(t.circleId, t.status), index("tasks_assignee_idx").on(t.assignedTo)]);
+
+/**
+ * Ride logistics. An appointment that someone must be driven to becomes a
+ * ride that needs a driver; a driver is offered it, accepts or declines, and
+ * a decline sends it back to needing a driver so it can be handed off.
+ */
+export const careRides = pgTable("care_rides", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  circleId: uuid("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  eventId: uuid("event_id").references(() => careEvents.id, { onDelete: "cascade" }),
+  purpose: text("purpose").notNull(),
+  pickupAt: timestamp("pickup_at", { withTimezone: true }),
+  pickupLocation: text("pickup_location"),
+  dropoffLocation: text("dropoff_location"),
+  status: text("status", { enum: ["needs_driver", "offered", "accepted", "declined", "completed", "cancelled"] }).notNull().default("needs_driver"),
+  driverId: uuid("driver_id").references(() => users.id),
+  assignedBy: uuid("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  declinedAt: timestamp("declined_at", { withTimezone: true }),
+  declineReason: text("decline_reason"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("rides_circle_idx").on(t.circleId, t.status), index("rides_driver_idx").on(t.driverId)]);
+
+/** Per-ride handoff history, so "who was asked, who said no" is visible. */
+export const careRideEvents = pgTable("care_ride_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  rideId: uuid("ride_id").notNull().references(() => careRides.id, { onDelete: "cascade" }),
+  actorId: uuid("actor_id").references(() => users.id),
+  action: text("action").notNull(),
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("ride_events_ride_idx").on(t.rideId, t.createdAt)]);
+
+export type CareMessage = typeof careMessages.$inferSelect;
+export type CareEventRow = typeof careEvents.$inferSelect;
+export type CareTask = typeof careTasks.$inferSelect;
+export type CareRide = typeof careRides.$inferSelect;
+export type CareRideEvent = typeof careRideEvents.$inferSelect;
+
 export const insertUserSchema = createInsertSchema(users);
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
