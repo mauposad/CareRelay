@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { CareState, CareEvent, CareProfile, CareTask, ClinicianQuestion, NormalizedMessage, AuditEntry, MessageSource } from '../types';
 import { PersonaId, getPersona, PERSONAS, UserRole } from '../lib/rbac';
 import { INITIAL_PROFILE, INITIAL_MESSAGES, INITIAL_EVENTS, INITIAL_TASKS, INITIAL_QUESTIONS, INITIAL_AUDIT, INITIAL_SUMMARY } from './fixtures';
-import { mockExtractionProvider } from '../lib/providers/extraction';
+import { apiExtractionProvider, extractCareEventsFromDocument, ExtractionResult } from '../lib/providers/extraction';
+import { fetchExtractionStatus, ExtractionStatus } from '../lib/api';
 import { coreService } from '../services/coreService';
 
 interface CareContextType {
@@ -13,6 +14,8 @@ interface CareContextType {
   
   // Actions
   ingestMessage: (text: string, source: MessageSource, senderId: string) => Promise<void>;
+  extractDocument: (file: File) => Promise<ExtractionResult & { documentName: string }>;
+  acceptDocumentEvents: (events: Partial<CareEvent>[], documentName: string) => number;
   confirmEvent: (id: string, updates?: Partial<CareEvent>) => void;
   updateEventSharing: (id: string, shared: boolean) => void;
   rejectEvent: (id: string) => void;
@@ -23,6 +26,10 @@ interface CareContextType {
   resetDemo: () => void;
   
   isProcessing: boolean;
+  /** Whether the server has live extraction credentials, or null while unknown. */
+  extractionStatus: ExtractionStatus | null;
+  /** Provenance of the most recent extraction, for the AI/demo-mode badge. */
+  lastExtraction: { mode: 'ai' | 'mock'; unresolved: string[]; fallbackReason?: string } | null;
 }
 
 const CareContext = createContext<CareContextType | null>(null);
@@ -105,10 +112,20 @@ export function CareProvider({ children }: { children: ReactNode }) {
     }
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus | null>(null);
+  const [lastExtraction, setLastExtraction] = useState<CareContextType['lastExtraction']>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    let active = true;
+    fetchExtractionStatus().then(status => {
+      if (active) setExtractionStatus(status);
+    });
+    return () => { active = false; };
+  }, []);
 
   const setPersona = useCallback((id: PersonaId) => {
     setCurrentPersona(getPersona(id));
@@ -159,7 +176,12 @@ export function CareProvider({ children }: { children: ReactNode }) {
       }));
 
       // Run extraction
-      const result = await mockExtractionProvider.extractCareEvents(text, source);
+      const result = await apiExtractionProvider.extractCareEvents(text, source);
+      setLastExtraction({
+        mode: result.mode,
+        unresolved: result.unresolved,
+        ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {})
+      });
       
       if (result.events.length > 0) {
         let newEvents: CareEvent[] = result.events.map((e, idx) => ({
@@ -187,6 +209,66 @@ export function CareProvider({ children }: { children: ReactNode }) {
       setIsProcessing(false);
     }
   }, [isProcessing]);
+
+  const extractDocument = useCallback(async (file: File) => {
+    setIsProcessing(true);
+    try {
+      const result = await extractCareEventsFromDocument(file);
+      setLastExtraction({
+        mode: result.mode,
+        unresolved: result.unresolved,
+        ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {})
+      });
+      return result;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  /**
+   * Carries reviewer-approved document findings into the shared care record as
+   * proposed events, so they go through the same confirmation and routing path
+   * as an imported chat message. Returns how many events were added.
+   */
+  const acceptDocumentEvents = useCallback((events: Partial<CareEvent>[], documentName: string) => {
+    if (events.length === 0) return 0;
+
+    const stamp = Date.now();
+    const msgId = `msg_doc_${stamp}`;
+    const newMessage: NormalizedMessage = {
+      id: msgId,
+      familyId: "fam_1",
+      careProfileId: "margaret",
+      senderId: currentPersona.id,
+      source: "internal",
+      body: `Care document reviewed: ${documentName}`,
+      receivedAt: new Date().toISOString(),
+      consent: "user_imported"
+    };
+
+    const newEvents: CareEvent[] = events.map((e, idx) => ({
+      ...e,
+      id: `evt_doc_${stamp}_${idx}`,
+      messageId: msgId,
+      status: 'proposed',
+    } as CareEvent));
+
+    setState(s => ({
+      ...s,
+      messages: [newMessage, ...s.messages],
+      events: [...newEvents, ...s.events],
+      audit: [{
+        id: `audit_${stamp}_doc`,
+        timestamp: new Date().toISOString(),
+        actorId: currentPersona.id,
+        action: "document_reviewed",
+        details: `Carried ${newEvents.length} reviewed finding(s) forward from ${documentName}`,
+        source: "document"
+      }, ...s.audit]
+    }));
+
+    return newEvents.length;
+  }, [currentPersona.id]);
 
   const confirmEvent = useCallback((id: string, updates?: Partial<CareEvent>) => {
     setState(s => coreService.confirmEvent(s, id, currentPersona.id, updates));
@@ -226,6 +308,8 @@ export function CareProvider({ children }: { children: ReactNode }) {
       setPersona,
       state,
       ingestMessage,
+      extractDocument,
+      acceptDocumentEvents,
       confirmEvent,
       updateEventSharing,
       rejectEvent,
@@ -234,7 +318,9 @@ export function CareProvider({ children }: { children: ReactNode }) {
       updateProfile,
       addAuditEntry,
       resetDemo,
-      isProcessing
+      isProcessing,
+      extractionStatus,
+      lastExtraction
     }}>
       {children}
     </CareContext.Provider>

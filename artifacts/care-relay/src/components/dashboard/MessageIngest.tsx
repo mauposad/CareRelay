@@ -4,13 +4,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mic, MessageSquarePlus, Loader2, FileText } from 'lucide-react';
+import { Mic, MessageSquarePlus, Loader2, FileText, Sparkles } from 'lucide-react';
 import { mockTranscriptionProvider } from '../../lib/providers/transcription';
 import { MessageSource } from '../../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function MessageIngest() {
-  const { ingestMessage, isProcessing, currentPersona } = useCareContext();
+  const { ingestMessage, isProcessing, currentPersona, extractionStatus, lastExtraction } = useCareContext();
   const [text, setText] = useState('');
   const [source, setSource] = useState<MessageSource>('whatsapp');
   const [isRecording, setIsRecording] = useState(false);
@@ -44,9 +44,19 @@ export function MessageIngest() {
       <p className="text-sm font-medium text-muted-foreground px-1">
         Paste one family update. Review the care facts. See what each person receives.
       </p>
-      <p role="note" className="text-xs text-amber-700 dark:text-amber-300 px-1">
-        Demo simulation: extraction supports the two example updates shown in the demo. Other text is saved as an unsupported general note for reviewer confirmation.
-      </p>
+      {extractionStatus && !extractionStatus.aiEnabled && (
+        <p role="note" className="text-xs text-amber-700 dark:text-amber-300 px-1">
+          Demo extraction: no API key is configured, so only the two sample updates extract in full. Other text is saved as a general note for reviewer confirmation.
+        </p>
+      )}
+      {lastExtraction && (
+        <p role="status" className="text-xs px-1 flex items-center gap-1 text-muted-foreground">
+          <Sparkles className="w-3 h-3" />
+          {lastExtraction.mode === 'ai'
+            ? `Last update read by ${extractionStatus?.model ?? 'the extraction model'}.`
+            : `Last update used demo extraction${lastExtraction.fallbackReason ? ` (${lastExtraction.fallbackReason})` : ''}.`}
+        </p>
+      )}
       <Card className="border shadow-sm bg-card overflow-hidden">
         <Tabs defaultValue="text" className="w-full">
           <div className="bg-muted/40 border-b px-4 py-2 flex items-center justify-between">

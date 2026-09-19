@@ -105,3 +105,34 @@ export function formatElderHeader(dateString: string | number | Date | null | un
 export function formatAuditTime(dateString: string | number | Date | null | undefined): string {
   return formatCareTime(dateString, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZoneName: 'short' });
 }
+
+/**
+ * Converts a `datetime-local` input value ("YYYY-MM-DDTHH:mm") into an ISO
+ * string anchored to the demo timezone, so a time a caregiver types is stored
+ * as that wall-clock time in New York rather than the browser's zone.
+ */
+export function nyIsoFromWallClock(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return '';
+
+  const [, year, month, day, hour, minute] = match.map(Number) as unknown as number[];
+
+  const approximate = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: DEMO_TIMEZONE,
+    timeZoneName: 'longOffset',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(approximate);
+
+  const offset = (parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-04:00').replace('GMT', '') || '+00:00';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${offset}`;
+}
+
+/** Current NY wall clock formatted for a `datetime-local` input's min attribute. */
+export function nyWallClockNow(): string {
+  const now = getNowInNY();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}

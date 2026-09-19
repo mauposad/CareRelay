@@ -6,6 +6,9 @@ import { Timeline } from './Timeline';
 import { TaskBoard } from './TaskBoard';
 import { ROLE, canUser, PERMISSIONS } from '../../lib/rbac';
 import { getRoleSpecificSummary } from '../../store/selectors';
+import { Button } from '@/components/ui/button';
+import { Link } from 'wouter';
+import { FileText } from 'lucide-react';
 
 export function CaregiverDashboard() {
   const { currentPersona, state } = useCareContext();
@@ -56,6 +59,24 @@ export function CaregiverDashboard() {
         </div>
 
         {canEdit && <MessageIngest />}
+        {canEdit && (
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium">Have a visit summary or discharge note?</div>
+                  <div className="text-sm text-muted-foreground">
+                    Review a care document and carry the findings into this timeline.
+                  </div>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" asChild className="shrink-0">
+                <Link href="/documents">Open document intake</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         {canEdit && <ProposedEvents />}
         
         {canUser(currentPersona.role, PERMISSIONS.VIEW_ALL_STRUCTURED_EVENTS) && <Timeline />}

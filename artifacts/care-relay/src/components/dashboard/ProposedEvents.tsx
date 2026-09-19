@@ -2,28 +2,54 @@ import { useState, useMemo } from 'react';
 import { useCareContext } from '../../store/CareContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Check, X, AlertTriangle, Calendar, Clock, CheckSquare, Activity, ShieldAlert } from 'lucide-react';
-import { CareEventType } from '../../types';
-import { formatTimeline, createNYDateISO, getNowInNY } from '../../lib/dateUtils';
+import { CareEvent, CareEventType } from '../../types';
+import { formatTimeline, createNYDateISO, getNowInNY, nyIsoFromWallClock, nyWallClockNow } from '../../lib/dateUtils';
 import { canUser, PERMISSIONS } from '../../lib/rbac';
 import { getEventRouting } from '../../store/selectors';
 
 export function ProposedEvents() {
   const { state, confirmEvent, rejectEvent, currentPersona } = useCareContext();
   const [timeSelections, setTimeSelections] = useState<Record<string, string>>({});
+  const [wallClockSelections, setWallClockSelections] = useState<Record<string, string>>({});
   const [sharingSelections, setSharingSelections] = useState<Record<string, boolean>>({});
   
   const proposed = state.events.filter(e => e.status === 'proposed');
 
-  const { nextFriday10, nextFriday22, tomorrow8 } = useMemo(() => {
+  const minWallClock = useMemo(() => nyWallClockNow(), []);
+
+  /**
+   * Quick picks are per-event because the useful shortcuts differ: a chat
+   * update says "Friday at 10", a discharge note says "in 2-4 weeks".
+   */
+  const shortcutsFor = (event: CareEvent) => {
     const daysToFriday = (5 - getNowInNY().getDay() + 7) % 7 || 7;
-    return {
-      nextFriday10: createNYDateISO(daysToFriday, 10),
-      nextFriday22: createNYDateISO(daysToFriday, 22),
-      tomorrow8: createNYDateISO(1, 8)
-    };
-  }, []);
+    const evidence = event.evidence?.toLowerCase() ?? '';
+    const shortcuts: { label: string; iso: string }[] = [];
+
+    if (/friday/.test(evidence)) {
+      shortcuts.push({ label: 'Friday 10:00 AM', iso: createNYDateISO(daysToFriday, 10) });
+      shortcuts.push({ label: 'Friday 10:00 PM', iso: createNYDateISO(daysToFriday, 22) });
+    }
+    if (event.type === 'exercise' || /morning/.test(evidence)) {
+      shortcuts.push({ label: 'Tomorrow 8:00 AM', iso: createNYDateISO(1, 8) });
+    }
+    const weeks = /(\d+)\s*(?:-|–|to)?\s*(\d+)?\s*weeks?/.exec(evidence);
+    if (weeks) {
+      const first = Number(weeks[1]);
+      const second = weeks[2] ? Number(weeks[2]) : undefined;
+      shortcuts.push({ label: `In ${first} week${first === 1 ? '' : 's'}`, iso: createNYDateISO(first * 7, 10) });
+      if (second && second !== first) {
+        shortcuts.push({ label: `In ${second} weeks`, iso: createNYDateISO(second * 7, 10) });
+      }
+    }
+    if (shortcuts.length === 0) {
+      shortcuts.push({ label: 'Tomorrow 10:00 AM', iso: createNYDateISO(1, 10) });
+      shortcuts.push({ label: 'Next week', iso: createNYDateISO(7, 10) });
+    }
+    return shortcuts;
+  };
 
   if (proposed.length === 0) return null;
 
@@ -96,16 +122,42 @@ export function ProposedEvents() {
                         <AlertTriangle className="w-3 h-3" />
                         Missing exact time. Caregiver review required.
                       </div>
-                      <Select value={timeSelections[event.id] || ""} onValueChange={(v) => setTimeSelections({...timeSelections, [event.id]: v})}>
-                        <SelectTrigger className="w-[200px] h-8 text-xs border-amber-200 dark:border-amber-900 focus:ring-amber-500">
-                          <SelectValue placeholder="Resolve time..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={nextFriday10}>Friday at 10:00 AM</SelectItem>
-                           <SelectItem value={nextFriday22}>Friday at 10:00 PM</SelectItem>
-                           {event.type === 'exercise' && <SelectItem value={tomorrow8}>Morning (8:00 AM)</SelectItem>}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <Input
+                          type="datetime-local"
+                          aria-label={`Set date and time for ${event.summary}`}
+                          min={minWallClock}
+                          className="w-[230px] h-8 text-xs border-amber-200 dark:border-amber-900 focus-visible:ring-amber-500"
+                          value={wallClockSelections[event.id] || ''}
+                          onChange={(e) => {
+                            const wallClock = e.target.value;
+                            setWallClockSelections(prev => ({ ...prev, [event.id]: wallClock }));
+                            const iso = wallClock ? nyIsoFromWallClock(wallClock) : '';
+                            setTimeSelections(prev => ({ ...prev, [event.id]: iso }));
+                          }}
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          {shortcutsFor(event).map(shortcut => (
+                            <Button
+                              key={shortcut.label}
+                              variant={timeSelections[event.id] === shortcut.iso ? 'default' : 'outline'}
+                              size="sm"
+                              className="h-6 px-2 text-[11px]"
+                              onClick={() => {
+                                setTimeSelections(prev => ({ ...prev, [event.id]: shortcut.iso }));
+                                setWallClockSelections(prev => ({ ...prev, [event.id]: '' }));
+                              }}
+                            >
+                              {shortcut.label}
+                            </Button>
+                          ))}
+                        </div>
+                        {timeSelections[event.id] && (
+                          <div className="text-[11px] text-muted-foreground">
+                            Will be scheduled for {formatTimeline(timeSelections[event.id])}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 

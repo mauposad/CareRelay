@@ -20,7 +20,7 @@ export default function Home() {
           <span className="text-muted-foreground italic font-normal">The right care out.</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-sans">
-          Explore a frontend demo of shared elder-care coordination. Review sample message extractions and confirm what each person needs to know.
+          Import a family update or a care document. CareRelay structures it, and you confirm what each person needs to know.
         </p>
       </div>
 
@@ -29,10 +29,10 @@ export default function Home() {
         <Card className="bg-card border-none shadow-sm ring-1 ring-border/50">
           <CardHeader>
             <Clock className="w-6 h-6 text-primary mb-2" />
-            <CardTitle>Universal Import</CardTitle>
+            <CardTitle>Chat &amp; Document Import</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground">
-            Paste or upload message text, or try a sample voice transcript. Extraction is simulated for the included examples; live messaging and recording are not connected.
+            Paste a chat excerpt, try a sample voice transcript, or upload a visit summary. Live messaging and recording are not connected; everything else runs the real extraction pipeline.
           </CardContent>
         </Card>
         
@@ -52,7 +52,7 @@ export default function Home() {
             <CardTitle>Safe Orchestration</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground">
-            Simulated extraction proposes care events with source evidence. A person resolves missing details and confirms before a reminder is created.
+            Extraction proposes care events with the source quote attached. A person resolves missing details and confirms before any reminder is created.
           </CardContent>
         </Card>
       </div>

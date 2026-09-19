@@ -16,6 +16,7 @@ import { AppLayout } from './components/shared/AppLayout';
 import Home from './pages/Home';
 import DashboardRouter from './pages/DashboardRouter';
 import SettingsPage from './pages/SettingsPage';
+import DocumentsPage from './pages/DocumentsPage';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/dashboard" component={DashboardRouter} />
+          <Route path="/documents" component={DocumentsPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>

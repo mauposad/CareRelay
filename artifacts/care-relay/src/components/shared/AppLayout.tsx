@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { useCareContext } from '../../store/CareContext';
-import { PERSONAS } from '../../lib/rbac';
+import { PERSONAS, canUser, PERMISSIONS } from '../../lib/rbac';
 import { Button } from '@/components/ui/button';
-import { ShieldAlert, Settings } from 'lucide-react';
+import { ShieldAlert, Settings, FileText } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'wouter';
 
@@ -59,6 +59,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {location !== '/' && (
               <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
                 <Link href="/">Overview</Link>
+              </Button>
+            )}
+            {location !== '/' && canUser(currentPersona.role, PERMISSIONS.VIEW_ALL_STRUCTURED_EVENTS) && (
+              <Button variant={location === '/documents' ? 'secondary' : 'ghost'} size="sm" asChild>
+                <Link href="/documents" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Documents</span>
+                </Link>
               </Button>
             )}
             {currentPersona.role === 'CARE_OWNER' && location !== '/settings' && location !== '/' && (
