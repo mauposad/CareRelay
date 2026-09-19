@@ -15,13 +15,14 @@ import { AppLayout } from './components/shared/AppLayout';
 import Home from './pages/Home';
 import DashboardRouter from './pages/DashboardRouter';
 import SettingsPage from './pages/SettingsPage';
+import DocumentsPage from './pages/DocumentsPage';
 import AuthPage from './pages/AuthPage';
 import { AuthProvider, useAuth } from './store/AuthContext';
 
 const queryClient = new QueryClient();
 
 function Router() {
-  const { user, isLoading, error } = useAuth();
+  const { user, activeCircle, isLoading, error } = useAuth();
   if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground" data-testid="status-auth-loading">Restoring your secure session…</div>;
   if (!user) return <AppLayout><AuthPage /></AppLayout>;
   if (error) return <AppLayout><div className="py-20 text-center text-destructive" data-testid="status-auth-error">{error}</div></AppLayout>;
@@ -31,6 +32,9 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/dashboard" component={DashboardRouter} />
+          <Route path="/documents">
+            <DocumentsPage key={`${user.id}:${activeCircle?.id ?? ''}:${activeCircle?.role ?? ''}`} />
+          </Route>
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>

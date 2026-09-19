@@ -1,55 +1,29 @@
 # CareRelay
 
-CareRelay turns noisy family care updates into structured, role-specific information for caregivers, clinicians, and older adults.
+CareRelay coordinates family care updates with authenticated care-circle membership and server-enforced roles.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm --filter @workspace/care-relay run dev` — run the CareRelay frontend
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Install with `pnpm install --frozen-lockfile`.
+- Use the managed `artifacts/care-relay: web` and `artifacts/api-server: API Server` workflows.
+- `pnpm run typecheck` checks the workspace.
+- `pnpm --filter @workspace/api-server test` runs backend authorization tests.
+- Frontend Vite commands require `PORT` and `BASE_PATH`; managed workflows provide them.
+- PostgreSQL (`DATABASE_URL`) is required by the authenticated API. Do not invent credentials or automatically seed/reset user data.
+- Extraction optionally uses `ANTHROPIC_API_KEY`; without it, the imported extraction service returns labeled deterministic demo results.
 
-## Stack
+## Merge boundaries
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Preserve the authenticated branch's session, care-circle membership, approval, audit, and role-management paths.
+- Do not replace server authorization with the main branch's demo persona switcher or localStorage care state.
+- Main also contains document intake, extraction providers, and legacy demo components. Importing those files does not make local demo state part of the authenticated care record.
+- Extraction routes require an authenticated session.
+- CareRelay coordinates reported information; it does not diagnose, prescribe, or replace emergency services.
 
-## Where things live
+## Source map
 
-- `artifacts/care-relay/src/types/index.ts` — normalized message, event, task, and care-profile contracts
-- `artifacts/care-relay/src/lib/providers/` — mock extraction and transcription provider interfaces
-- `artifacts/care-relay/src/components/` — family, physician, elder, Care Circle, and demo controls
-- `artifacts/care-relay/src/index.css` — CareRelay visual tokens and global styles
-
-## Architecture decisions
-
-- The current build is frontend-only; mock data is isolated behind service functions for later backend replacement.
-- Role-based visibility is centralized in the RBAC module instead of being scattered across components.
-- Family, physician, and elder personas use distinct information architectures, not one dashboard with renamed navigation.
-- Product copy treats symptoms as family-reported observations and never presents diagnosis or medical advice.
-
-## Product
-
-- Switch among Care Owner, Primary Caregiver, Family Support, Family Viewer, Physician, and Elder demo roles.
-- Simulate a noisy family message being organized into relevant care events.
-- Confirm assigned transportation and see the result propagate across role-specific views.
-- Demonstrate selective sharing and access rules through the Care Circle experience.
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- `artifacts/api-server/src/routes/` — authentication, care circles, approvals, membership, audit, and extraction
+- `artifacts/care-relay/src/store/AuthContext.tsx` — authenticated client state
+- `artifacts/care-relay/src/store/CareContext.tsx` — legacy demo state, not server-authoritative
+- `artifacts/care-relay/src/pages/DocumentsPage.tsx` — imported document intake
+- `lib/db/src/schema/` — persisted schema

@@ -28,10 +28,10 @@ export default function Home() {
         <Card className="bg-card border-none shadow-sm ring-1 ring-border/50">
           <CardHeader>
             <Clock className="w-6 h-6 text-primary mb-2" />
-            <CardTitle>Universal Import</CardTitle>
+            <CardTitle>Document Preview</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground">
-            Paste or upload message text, or try a sample voice transcript. Extraction is simulated for the included examples; live messaging and recording are not connected.
+            Authorized primary users and caretakers can preview extracted document findings. Preview selections are temporary and are not saved to the care record.
           </CardContent>
         </Card>
         
@@ -51,7 +51,7 @@ export default function Home() {
             <CardTitle>Safe Orchestration</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground">
-            Simulated extraction proposes care events with source evidence. A person resolves missing details and confirms before a reminder is created.
+            Server-backed care records follow your circle’s role and assistance-tier permissions. Document previews do not create records, approval requests, or reminders.
           </CardContent>
         </Card>
       </div>

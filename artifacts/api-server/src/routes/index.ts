@@ -5,6 +5,7 @@ import circlesRouter from "./circles";
 import approvalsRouter from "./approvals";
 import membersRouter from "./members";
 import auditRouter from "./audit";
+import extractRouter from "./extract";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(circlesRouter);
 router.use(approvalsRouter);
 router.use(membersRouter);
 router.use(auditRouter);
+router.use(extractRouter);
 
 export default router;

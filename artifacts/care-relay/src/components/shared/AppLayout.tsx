@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { ShieldAlert, Settings } from 'lucide-react';
+import { ShieldAlert, Settings, FileText } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '../../store/AuthContext';
 
@@ -32,6 +32,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
+            {user && (activeCircle?.role === 'primary_user' || activeCircle?.role === 'primary_caretaker') && (
+              <Button variant={location === '/documents' ? 'secondary' : 'ghost'} size="sm" asChild>
+                <Link href="/documents" className="flex items-center gap-2" data-testid="link-documents">
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Documents</span>
+                </Link>
+              </Button>
+            )}
             {location !== '/' && (
               <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
                 <Link href="/">Overview</Link>

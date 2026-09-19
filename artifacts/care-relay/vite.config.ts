@@ -72,6 +72,14 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // In Replit the path router serves the API at /api on the same origin.
+    // Locally we proxy so the frontend can use the same relative URLs.
+    proxy: {
+      '/api': {
+        target: `http://localhost:${process.env.API_PORT ?? 8080}`,
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port,

@@ -1,1 +1,1 @@
-- [Architecture scope](architecture-scope.md) — architecture adaptation preserves the frontend-only boundary; live AI, voice, and server authorization remain separate work.
+- [Architecture scope](architecture-scope.md) — authenticated-branch merges must preserve server authorization rather than reintroduce demo persona access.
